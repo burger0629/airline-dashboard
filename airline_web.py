@@ -58,7 +58,7 @@ with col1:
     
     # 畫出當前體質
     fig.add_trace(go.Scatterpolar(
-        r=values + [values[0]], # 數值接回起點讓多邊形閉合
+        r=values + [values[0]], 
         theta=categories + [categories[0]],
         fill='toself',
         name='當前營運體質',
@@ -71,8 +71,7 @@ with col1:
         theta=categories + [categories[0]],
         fill=None,
         name='目標最佳化狀態',
-        line_color='mediumseagreen',
-        line_dash='dash'
+        line=dict(color='mediumseagreen', dash='dash')
     ))
 
     fig.update_layout(
@@ -101,9 +100,6 @@ with col2:
     st.warning(f"最大營運缺口落在 **【{max_budget_category}】**，系統已自動將最大宗資源排程至此項目。")
     
     if score_safety < 80:
-        st.error("🚨 **飛安警報**：飛安控管分數低於 80 分，處於高風險狀態。請務必優先執行飛安預算配置，並啟動 SMS 專案審查。")
-    else:
-        st.success("✅ 飛安指標處於穩定水準。")
         st.error("🚨 **飛安警報**：飛安控管分數低於 80 分，處於高風險狀態。請務必優先執行飛安預算配置，並啟動 SMS 專案審查。")
     else:
         st.success("✅ 飛安指標處於穩定水準。")
