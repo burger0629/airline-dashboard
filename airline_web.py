@@ -59,34 +59,15 @@ allocations = result.x if result.success else initial_guess
 alloc_dict = {cat: alloc for cat, alloc in zip(categories, allocations)}
 
 # ==========================================
-# 一鍵匯出報表功能
-# ==========================================
-report_content = f"""# 航空公司年度營運診斷與資源最佳化報告
-**報告生成時間：** {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-**總可用預算：** {total_budget} 百萬台幣
-
-## 一、 年度指標進退步分析\n"""
-for i, cat in enumerate(categories):
-    delta = curr_scores[i] - prev_scores[i]
-    report_content += f"- **{cat}**：本年 {curr_scores[i]:.1f} 分 (去年 {prev_scores[i]:.1f} 分) | 變動：{delta:+.1f} 分\n"
-
-report_content += "\n## 二、 最佳化預算配置建議\n"
-for cat, alloc in alloc_dict.items():
-    report_content += f"- **{cat}**：建議投入 {alloc:.1f} 百萬台幣\n"
-
-st.sidebar.divider()
-st.sidebar.download_button(label="📄 匯出年度營運診斷書 (Report)", data=report_content, file_name="Airline_Operations_Report.md", mime="text/markdown")
-
-# ==========================================
 # UI 元件與六級知識庫設定
 # ==========================================
 def get_risk_level_config(score):
-    if score == 100.0: return ('perfect', "#00d26a", "🏆 卓越典範 (PERFECT) —— 系統處於理想狀態，維持卓越並分享經驗")
-    elif score >= 81.0: return ('stable', "#28a745", "✅ 安全穩定 (STABLE) —— 績效優良，持續精益求精與深化文化")
-    elif score >= 61.0: return ('caution', "#ffc107", "⚠️ 黃色警戒 (CAUTION) —— 績效輕微下滑，需啟動主動式數據監測")
-    elif score >= 41.0: return ('serious', "#fd7e14", "🟠 橘色風險 (SERIOUS) —— 存在組織性漏洞，需深度重整與系統性對策")
-    elif score >= 21.0: return ('high_risk', "#e74c3c", "🔴 紅色高危 (HIGH RISK) —— 系統防禦失效，需立即介入與危機處置")
-    else: return ('catastrophic', "#ff3333", "🚨 災難崩潰 (CATASTROPHIC) —— 組織機能癱瘓，立即停止營運並全面重審")
+    if score == 100.0: return ('perfect', "#00d26a", "🏆 卓越典範 (PERFECT)")
+    elif score >= 81.0: return ('stable', "#28a745", "✅ 安全穩定 (STABLE)")
+    elif score >= 61.0: return ('caution', "#ffc107", "⚠️ 黃色警戒 (CAUTION)")
+    elif score >= 41.0: return ('serious', "#fd7e14", "🟠 橘色風險 (SERIOUS)")
+    elif score >= 21.0: return ('high_risk', "#e74c3c", "🔴 紅色高危 (HIGH RISK)")
+    else: return ('catastrophic', "#ff3333", "🚨 災難崩潰 (CATASTROPHIC)")
 
 def render_diagnosis_card(category, score, delta):
     level, main_color, status_text = get_risk_level_config(score)
@@ -144,6 +125,38 @@ knowledge_base = {
 }
 
 # ==========================================
+# 一鍵匯出報表功能 (升級加入專家建議)
+# ==========================================
+report_content = f"""# 航空公司年度營運診斷與資源最佳化報告
+**報告生成時間：** {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+**總可用預算：** {total_budget} 百萬台幣
+
+## 一、 年度指標進退步分析\n"""
+for i, cat in enumerate(categories):
+    delta = curr_scores[i] - prev_scores[i]
+    report_content += f"- **{cat}**：本年 {curr_scores[i]:.1f} 分 (去年 {prev_scores[i]:.1f} 分) | 變動：{delta:+.1f} 分\n"
+
+report_content += "\n## 二、 最佳化預算配置建議\n"
+for cat, alloc in alloc_dict.items():
+    report_content += f"- **{cat}**：建議投入 {alloc:.1f} 百萬台幣\n"
+
+report_content += "\n## 三、 深度專家診斷與改善行動方案\n"
+for i, cat in enumerate(categories):
+    level, _, status_text = get_risk_level_config(curr_scores[i])
+    data = knowledge_base[cat][level]
+    report_content += f"\n### 【{cat}】 狀態判定：{status_text}\n"
+    if level in ['catastrophic', 'high_risk', 'serious', 'caution']:
+        report_content += "**🔍 潛在根本原因：**\n"
+        for reason in data['reasons']:
+            report_content += f"- {reason}\n"
+    report_content += "**🛠️ 具體執行方案：**\n"
+    for action in data['actions']:
+        report_content += f"- {action}\n"
+
+st.sidebar.divider()
+st.sidebar.download_button(label="📄 匯出完整營運診斷書 (Report)", data=report_content, file_name="Airline_Operations_Report.md", mime="text/markdown")
+
+# ==========================================
 # 建立頁籤架構 (Tabs) 
 # ==========================================
 tab1, tab2, tab3, tab4 = st.tabs(["📊 核心診斷分配", "📈 長期趨勢 (匯入)", "🔮 沙盤推演 (預測)", "🌍 全球航線風險評估"])
@@ -153,6 +166,8 @@ with tab1:
     with col1:
         st.subheader("🔄 年度營運體質對比雷達圖")
         fig = go.Figure()
+        # 補回漏掉的 100分目標虛線！
+        fig.add_trace(go.Scatterpolar(r=[100]*5, theta=categories+[categories[0]], fill=None, name='目標標準', line=dict(color='mediumseagreen', dash='dash')))
         fig.add_trace(go.Scatterpolar(r=list(prev_scores)+[prev_scores[0]], theta=categories+[categories[0]], fill='toself', name='前年度', line_color='rgba(150, 150, 150, 0.5)'))
         fig.add_trace(go.Scatterpolar(r=list(curr_scores)+[curr_scores[0]], theta=categories+[categories[0]], fill='toself', name='本年度', line_color='royalblue', fillcolor='rgba(65, 105, 225, 0.2)'))
         fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), margin=dict(l=40, r=40, t=30, b=30))
@@ -167,7 +182,6 @@ with tab1:
                 st.metric(label=cat, value=f"{curr_scores[i]:.1f}", delta=f"{delta:.1f}")
                 st.caption(f"💰 建議預算: **{alloc_dict[cat]:.1f} 百萬**")
 
-    # 專家診斷展開區
     st.divider()
     st.subheader("📋 年度趨勢診斷報告與具體改善行動書")
     for i, cat in enumerate(categories):
@@ -199,7 +213,7 @@ with tab2:
         df_trend = pd.DataFrame({'年份': years, '飛安控管': [92, 88, 85, prev_safety, curr_safety], '機隊維修': [80, 75, 65, prev_maint, curr_maint], '航班調度': [88, 85, 82, prev_otp, curr_otp], '旅客服務': [85, 90, 92, prev_service, curr_service]})
     
     df_melted = df_trend.melt(id_vars=['年份'], var_name='營運指標', value_name='分數')
-    fig_line = px.line(df_melted, x='年份', y='分數', color='營運指標', markers=True, title='各項營運指標長期趨勢追蹤') # 補回圖表大標題！
+    fig_line = px.line(df_melted, x='年份', y='分數', color='營運指標', markers=True, title='各項營運指標長期趨勢追蹤')
     fig_line.update_layout(yaxis=dict(range=[0, 100]))
     st.plotly_chart(fig_line, use_container_width=True)
     
@@ -226,6 +240,7 @@ with tab3:
         predicted_scores = np.clip(curr_scores + k_factors * np.sqrt(sim_allocs), 0, 100)
         
         fig_sim = go.Figure()
+        fig_sim.add_trace(go.Scatterpolar(r=[100]*5, theta=categories+[categories[0]], fill=None, name='目標標準', line=dict(color='mediumseagreen', dash='dash')))
         fig_sim.add_trace(go.Scatterpolar(r=list(curr_scores)+[curr_scores[0]], theta=categories+[categories[0]], fill='toself', name='本年度現況', line_color='rgba(150, 150, 150, 0.5)'))
         fig_sim.add_trace(go.Scatterpolar(r=list(predicted_scores)+[predicted_scores[0]], theta=categories+[categories[0]], fill='toself', name='明年度預測', line_color='mediumseagreen', fillcolor='rgba(46, 204, 113, 0.3)'))
         fig_sim.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), margin=dict(l=40, r=40, t=30, b=30))
@@ -245,7 +260,7 @@ with tab3:
 @st.cache_data(show_spinner=False)
 def get_lat_lon(location_name):
     try:
-        geolocator = Nominatim(user_agent="airline_dashboard_v3")
+        geolocator = Nominatim(user_agent="airline_dashboard_v5")
         loc = geolocator.geocode(location_name, timeout=10)
         if loc: return loc.latitude, loc.longitude
         return None, None
@@ -261,20 +276,20 @@ def get_live_weather(lat, lon):
         temp_c = curr.get('temperature_2m', "N/A")
         
         code = curr.get('weather_code', 0)
-        if code in [0, 1, 2, 3]: condition = "晴朗/多雲 🌤️"
+        if code in [0, 1, 2, 3]: condition = "晴朗多雲 🌤️"
         elif code in [45, 48]: condition = "濃霧視障 🌫️"
-        elif code in [51, 53, 55, 61, 63, 65, 80, 81, 82]: condition = "降雨/陣雨 🌧️"
+        elif code in [51, 53, 55, 61, 63, 65, 80, 81, 82]: condition = "降雨陣雨 🌧️"
         elif code in [71, 73, 75, 77, 85, 86]: condition = "降雪 ❄️"
-        elif code in [95, 96, 99]: condition = "雷暴/極端不穩定 ⛈️"
+        elif code in [95, 96, 99]: condition = "雷暴極端 ⛈️"
         else: condition = "未知氣候"
             
         return wind_kt, temp_c, condition
     except:
-        return "連線失敗", "連線失敗", "資料無法取得"
+        return "N/A", "N/A", "連線失敗"
 
 with tab4:
     st.subheader("🌍 全球動態航線風險評估 (Live API 串接版)")
-    st.markdown("系統已成功串接 **Geocoding API (地理定位)** 與 **Open-Meteo API (即時衛星氣象)**。將針對航線中繼點進行真實環境數據抓取。")
+    st.markdown("系統已成功串接 **Geocoding API (地理定位)** 與 **Open-Meteo API (即時衛星氣象)**。將針對起降機場與航線中繼點進行真實環境數據抓取。")
     
     airport_presets = [
         "TPE (台北 桃園機場)", "NRT (東京 成田機場)", "SIN (新加坡 樟宜機場)",
@@ -312,7 +327,9 @@ with tab4:
             mid_lat = (o_lat + d_lat) / 2
             mid_lon = (o_lon + d_lon) / 2
             
-            live_wind, live_temp, live_cond = get_live_weather(mid_lat, mid_lon)
+            o_wind, o_temp, o_cond = get_live_weather(o_lat, o_lon)
+            d_wind, d_temp, d_cond = get_live_weather(d_lat, d_lon)
+            mid_wind, mid_temp, mid_cond = get_live_weather(mid_lat, mid_lon)
 
             detour_lat = max(min(mid_lat - 15, 89.0), -89.0)
             detour_lon = mid_lon + 15
@@ -349,19 +366,25 @@ with tab4:
             fig_map.update_layout(height=500, margin=dict(l=0, r=0, t=30, b=0), legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01))
             st.plotly_chart(fig_map, use_container_width=True)
 
+            st.markdown("### 🌤️ 即時飛航氣象簡報 (Live METAR/Weather)")
+            w_col1, w_col2, w_col3 = st.columns(3)
+            with w_col1:
+                st.info(f"**🛫 起飛地：{origin_input[:10]}**\n\n- 氣候狀態：{o_cond}\n- 實時氣溫：{o_temp} °C\n- 地表風速：{o_wind} 節 (kt)")
+            with w_col2:
+                st.warning(f"**⚠️ 航路中繼：危險管制區**\n\n- 氣候狀態：{mid_cond}\n- 實時氣溫：{mid_temp} °C\n- 航路風速：{mid_wind} 節 (kt)")
+            with w_col3:
+                st.success(f"**🛬 降落地：{dest_input[:10]}**\n\n- 氣候狀態：{d_cond}\n- 實時氣溫：{d_temp} °C\n- 地表風速：{d_wind} 節 (kt)")
+
+            st.divider()
+
             map_col1, map_col2 = st.columns(2)
             with map_col1:
-                st.error(f"### 🚨 航線綜合風險情報 ({origin_input[:5]} ✈️ {dest_input[:5]})")
+                st.error(f"### 🚨 航路地緣政治情報 (Simulated)")
                 
                 st.markdown(f"""
-                **⚠️ 實時氣象觀測 (Live API Data)：** 座標 ({mid_lat:.2f}, {mid_lon:.2f}) 
-                - **當前氣候狀態：** {live_cond}
-                - **地表風速：** {live_wind} knots (節)
-                - **環境溫度：** {live_temp} °C
-                
-                **🚩 地緣政治與飛安情報 (Simulated)：** 周邊 500 海浬
-                - **飛彈活動 (Missile Threats)：** 該區域存在未經公告之軍事演習或長程飛彈試射，極高誤擊風險。
-                - **GPS 欺騙干擾：** 近 48 小時內接獲多起訊號覆寫回報。
+                **影響空域：** 座標 ({mid_lat:.2f}, {mid_lon:.2f}) 周邊 500 海浬
+                - **飛彈活動 (Missile Threats)：** 該區域近期存在未經公告之軍事演習或長程飛彈試射，極高誤擊風險。
+                - **GPS 欺騙干擾 (Spoofing)：** 近 48 小時內接獲多起訊號覆寫回報。
                 """)
                 st.button("❌ 拒絕此航線 (Deny Route)", type="primary")
 
