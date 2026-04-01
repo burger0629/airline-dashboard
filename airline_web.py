@@ -5,12 +5,13 @@ import plotly.graph_objects as go
 import plotly.express as px
 from scipy.optimize import minimize
 import datetime
+from geopy.geocoders import Nominatim
 
 # 設定網頁版面 (寬版)
 st.set_page_config(page_title="航空公司營運戰情室", layout="wide")
 
 st.title("✈️ 航空公司營運戰情室 (Aviation War Room)")
-st.markdown("整合 **六級風險深度診斷**、**作業研究最佳化**、**長期趨勢預測** 與 **動態航線風險評估** 的決策支援系統。")
+st.markdown("整合 **六級風險深度診斷**、**作業研究最佳化**、**長期趨勢預測** 與 **全球動態航線風險評估** 的決策支援系統。")
 
 # ==========================================
 # 網頁側邊欄 (數據輸入)
@@ -57,14 +58,13 @@ allocations = result.x if result.success else initial_guess
 alloc_dict = {cat: alloc for cat, alloc in zip(categories, allocations)}
 
 # ==========================================
-# 一鍵匯出報表功能 (回歸！)
+# 一鍵匯出報表功能
 # ==========================================
 report_content = f"""# 航空公司年度營運診斷與資源最佳化報告
 **報告生成時間：** {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 **總可用預算：** {total_budget} 百萬台幣
 
-## 一、 年度指標進退步分析
-"""
+## 一、 年度指標進退步分析\n"""
 for i, cat in enumerate(categories):
     delta = curr_scores[i] - prev_scores[i]
     report_content += f"- **{cat}**：本年 {curr_scores[i]:.1f} 分 (去年 {prev_scores[i]:.1f} 分) | 變動：{delta:+.1f} 分\n"
@@ -74,12 +74,7 @@ for cat, alloc in alloc_dict.items():
     report_content += f"- **{cat}**：建議投入 {alloc:.1f} 百萬台幣\n"
 
 st.sidebar.divider()
-st.sidebar.download_button(
-    label="📄 匯出年度營運診斷書 (Report)", 
-    data=report_content, 
-    file_name="Airline_Operations_Report.md", 
-    mime="text/markdown"
-)
+st.sidebar.download_button(label="📄 匯出年度營運診斷書 (Report)", data=report_content, file_name="Airline_Operations_Report.md", mime="text/markdown")
 
 # ==========================================
 # UI 元件與六級知識庫設定
@@ -150,7 +145,7 @@ knowledge_base = {
 # ==========================================
 # 建立頁籤架構 (Tabs) 
 # ==========================================
-tab1, tab2, tab3, tab4 = st.tabs(["📊 核心診斷分配", "📈 長期趨勢 (檔案匯入)", "🔮 沙盤推演 (預測)", "🌍 航線風險評估 (自選)"])
+tab1, tab2, tab3, tab4 = st.tabs(["📊 核心診斷分配", "📈 長期趨勢 (匯入)", "🔮 沙盤推演 (預測)", "🌍 全球航線風險評估"])
 
 with tab1:
     col1, col2 = st.columns([1.2, 1])
@@ -171,7 +166,7 @@ with tab1:
                 st.metric(label=cat, value=f"{curr_scores[i]:.1f}", delta=f"{delta:.1f}")
                 st.caption(f"💰 建議預算: **{alloc_dict[cat]:.1f} 百萬**")
 
-    # 完整回歸的專家診斷展開區
+    # 專家診斷展開區
     st.divider()
     st.subheader("📋 年度趨勢診斷報告與具體改善行動書")
     for i, cat in enumerate(categories):
@@ -191,10 +186,8 @@ with tab1:
             st.markdown("<br>", unsafe_allow_html=True)
 
 with tab2:
-    # 歷史營運資料與CSV上傳功能 (回歸！)
     st.subheader("📈 歷史營運數據趨勢分析 (五年期)")
     st.markdown("您可以上傳包含歷史數據的 CSV 檔案，或查看系統預設的模擬數據。")
-    
     uploaded_file = st.file_uploader("📂 上傳歷史營運數據 (CSV)", type="csv")
     
     if uploaded_file is not None:
@@ -202,17 +195,10 @@ with tab2:
         st.success("檔案讀取成功！")
     else:
         years = ['2022', '2023', '2024', '2025', '2026(YTD)']
-        df_trend = pd.DataFrame({
-            '年份': years,
-            '飛安控管': [92, 88, 85, prev_safety, curr_safety],
-            '機隊維修': [80, 75, 65, prev_maint, curr_maint],
-            '航班調度': [88, 85, 82, prev_otp, curr_otp],
-            '旅客服務': [85, 90, 92, prev_service, curr_service]
-        })
+        df_trend = pd.DataFrame({'年份': years, '飛安控管': [92, 88, 85, prev_safety, curr_safety], '機隊維修': [80, 75, 65, prev_maint, curr_maint], '航班調度': [88, 85, 82, prev_otp, curr_otp], '旅客服務': [85, 90, 92, prev_service, curr_service]})
     
-    # 繪製五年歷史趨勢折線圖
     df_melted = df_trend.melt(id_vars=['年份'], var_name='營運指標', value_name='分數')
-    fig_line = px.line(df_melted, x='年份', y='分數', color='營運指標', markers=True, title='各項營運指標長期趨勢追蹤')
+    fig_line = px.line(df_melted, x='年份', y='分數', color='營運指標', markers=True)
     fig_line.update_layout(yaxis=dict(range=[0, 100]))
     st.plotly_chart(fig_line, use_container_width=True)
     
@@ -220,11 +206,9 @@ with tab2:
         st.dataframe(df_trend, use_container_width=True)
 
 with tab3:
-    # 沙盤推演與預測模型 (回歸！)
     st.subheader("🔮 決策沙盤推演 (What-If Simulator)")
-    st.markdown("手動調配預算，系統將利用 **邊際效益遞減模型** 反向推算明年度的預期營運分數。")
+    st.markdown("手動調配預算，系統將利用 **邊際效益遞減模型** 反向推算明年度預期分數。")
     st.info(f"您目前共有 **{total_budget} 百萬** 的籌碼可以分配。")
-    
     sim_cols = st.columns(4)
     sim_allocs = []
     for i, cat in enumerate(categories):
@@ -237,14 +221,12 @@ with tab3:
         st.error(f"⚠️ 預算超支！您分配了 {total_sim} 百萬，但總預算只有 {total_budget} 百萬。")
     else:
         st.success(f"預算分配完畢 (剩餘 {total_budget - total_sim} 百萬)。以下為系統預測之明年成績：")
-        
         k_factors = np.array([1.5, 2.0, 1.2, 1.0])
         predicted_scores = np.clip(curr_scores + k_factors * np.sqrt(sim_allocs), 0, 100)
         
-        # 繪製預測雷達圖
         fig_sim = go.Figure()
-        fig_sim.add_trace(go.Scatterpolar(r=list(curr_scores)+[curr_scores[0]], theta=categories+[categories[0]], fill='toself', name='本年度 (現況)', line_color='rgba(150, 150, 150, 0.5)'))
-        fig_sim.add_trace(go.Scatterpolar(r=list(predicted_scores)+[predicted_scores[0]], theta=categories+[categories[0]], fill='toself', name='明年度 (預測)', line_color='mediumseagreen', fillcolor='rgba(46, 204, 113, 0.3)'))
+        fig_sim.add_trace(go.Scatterpolar(r=list(curr_scores)+[curr_scores[0]], theta=categories+[categories[0]], fill='toself', name='本年度現況', line_color='rgba(150, 150, 150, 0.5)'))
+        fig_sim.add_trace(go.Scatterpolar(r=list(predicted_scores)+[predicted_scores[0]], theta=categories+[categories[0]], fill='toself', name='明年度預測', line_color='mediumseagreen', fillcolor='rgba(46, 204, 113, 0.3)'))
         fig_sim.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), margin=dict(l=40, r=40, t=30, b=30))
         
         sim_res_cols = st.columns([1, 1])
@@ -257,93 +239,117 @@ with tab3:
                 st.metric(label=f"預測 {cat} 分數", value=f"{predicted_scores[i]:.1f} 分", delta=f"預期成長 {growth:+.1f} 分")
 
 with tab4:
-    # 航線風險評估模組 (包含下拉選單自訂起降)
-    st.subheader("🌍 航線動態風險評估與重飛計畫 (Dynamic Routing)")
-    st.markdown("串接全球情報與飛航公告 (NOTAMs)，動態計算航線衝突區並給予繞道成本評估。")
+    st.subheader("🌍 全球動態航線風險評估與重飛計畫")
+    st.markdown("結合下拉選單與地理編碼系統 (Geocoding API)，您可以選擇預設機場，或自行輸入全球任何地名。")
     
-    airport_db = {
-        'TPE (台北 桃園)': (25.07, 121.23),
-        'NRT (東京 成田)': (35.77, 140.39),
-        'SIN (新加坡 樟宜)': (1.36, 103.99),
-        'FRA (法蘭克福)': (50.03, 8.57),
-        'LHR (倫敦 希斯洛)': (51.47, -0.45),
-        'JFK (紐約 甘迺迪)': (40.64, -73.77),
-        'LAX (洛杉磯)': (33.94, -118.40),
-        'DXB (杜拜)': (25.25, 55.36),
-        'SYD (雪梨)': (-33.94, 151.17)
-    }
+    @st.cache_data(show_spinner=False)
+    def get_lat_lon(location_name):
+        try:
+            geolocator = Nominatim(user_agent="airline_dashboard_v2")
+            loc = geolocator.geocode(location_name, timeout=10)
+            if loc: return loc.latitude, loc.longitude
+            return None, None
+        except: return None, None
+
+    # 智慧雙模輸入：提供下拉選單，並包含「自行輸入」選項
+    airport_presets = [
+        "TPE (台北 桃園機場)", "NRT (東京 成田機場)", "SIN (新加坡 樟宜機場)",
+        "FRA (法蘭克福機場)", "LHR (倫敦 希斯洛機場)", "JFK (紐約 甘迺迪機場)",
+        "LAX (洛杉磯機場)", "DXB (杜拜機場)", "SYD (雪梨機場)", "🌍 自行輸入其他地點..."
+    ]
 
     route_col1, route_col2 = st.columns(2)
     with route_col1:
-        origin = st.selectbox("🛫 起飛機場 (Origin)", list(airport_db.keys()), index=0)
+        origin_sel = st.selectbox("🛫 選擇起飛機場 (Origin)", airport_presets, index=0)
+        if origin_sel == "🌍 自行輸入其他地點...":
+            origin_input = st.text_input("請輸入起飛地點 (中英文皆可)：", placeholder="例如: 巴黎, 曼谷 BKK...")
+        else:
+            origin_input = origin_sel
+
     with route_col2:
-        destination = st.selectbox("🛬 降落機場 (Destination)", list(airport_db.keys()), index=3)
+        dest_sel = st.selectbox("🛬 選擇降落機場 (Destination)", airport_presets, index=3)
+        if dest_sel == "🌍 自行輸入其他地點...":
+            dest_input = st.text_input("請輸入降落地點 (中英文皆可)：", placeholder="例如: 羅馬, 首爾 ICN...")
+        else:
+            dest_input = dest_sel
 
-    if origin == destination:
-        st.warning("⚠️ 起飛與降落機場不能相同，請重新選擇。")
-    else:
-        o_lat, o_lon = airport_db[origin]
-        d_lat, d_lon = airport_db[destination]
+    if origin_input and dest_input:
+        with st.spinner('📡 正在透過全球衛星系統定位座標中...'):
+            o_lat, o_lon = get_lat_lon(origin_input)
+            d_lat, d_lon = get_lat_lon(dest_input)
 
-        mid_lat = (o_lat + d_lat) / 2
-        mid_lon = (o_lon + d_lon) / 2
+        if o_lat is None:
+            st.error(f"❌ 找不到起飛地點「{origin_input}」的座標，請嘗試輸入更完整的名稱。")
+        elif d_lat is None:
+            st.error(f"❌ 找不到降落地點「{dest_input}」的座標，請嘗試輸入更完整的名稱。")
+        elif o_lat == d_lat and o_lon == d_lon:
+            st.warning("⚠️ 起飛與降落地點過於接近或相同，無法計算航線。")
+        else:
+            mid_lat = (o_lat + d_lat) / 2
+            mid_lon = (o_lon + d_lon) / 2
 
-        detour_lat = mid_lat - 15 
-        detour_lon = mid_lon + 10
+            # 動態產生安全繞飛點
+            detour_lat = max(min(mid_lat - 15, 89.0), -89.0)
+            detour_lon = mid_lon + 15
+            if detour_lon > 180: detour_lon -= 360
+            elif detour_lon < -180: detour_lon += 360
 
-        fig_map = go.Figure()
+            fig_map = go.Figure()
 
-        fig_map.add_trace(go.Scattergeo(
-            lat=[mid_lat], lon=[mid_lon],
-            marker=dict(size=90, color='red', opacity=0.3),
-            name="🚨 模擬高風險管制區", mode="markers"
-        ))
+            fig_map.add_trace(go.Scattergeo(
+                lat=[mid_lat], lon=[mid_lon],
+                marker=dict(size=90, color='red', opacity=0.3),
+                name="🚨 模擬高風險管制區", mode="markers"
+            ))
 
-        fig_map.add_trace(go.Scattergeo(
-            lat=[o_lat, mid_lat, d_lat],
-            lon=[o_lon, mid_lon, d_lon],
-            mode='lines+markers', line=dict(width=3, color='red', dash='dash'),
-            name="原訂直飛航線 (高風險)", text=[origin[:3], "Danger Zone", destination[:3]], textposition="bottom center"
-        ))
+            fig_map.add_trace(go.Scattergeo(
+                lat=[o_lat, mid_lat, d_lat], lon=[o_lon, mid_lon, d_lon],
+                mode='lines+markers', line=dict(width=3, color='red', dash='dash'),
+                name="原訂直飛航線 (高風險)", text=[origin_input[:5], "Danger Zone", dest_input[:5]], textposition="bottom center"
+            ))
 
-        fig_map.add_trace(go.Scattergeo(
-            lat=[o_lat, detour_lat, d_lat],
-            lon=[o_lon, detour_lon, d_lon],
-            mode='lines+markers', line=dict(width=3, color='mediumseagreen'),
-            name="建議備用航線 (安全繞飛)", text=[origin[:3], "Safe Waypoint", destination[:3]], textposition="bottom center"
-        ))
+            fig_map.add_trace(go.Scattergeo(
+                lat=[o_lat, detour_lat, d_lat], lon=[o_lon, detour_lon, d_lon],
+                mode='lines+markers', line=dict(width=3, color='mediumseagreen'),
+                name="建議備用航線 (安全繞飛)", text=[origin_input[:5], "Safe Waypoint", dest_input[:5]], textposition="bottom center"
+            ))
 
-        fig_map.update_geos(
-            projection_type="natural earth",
-            showcountries=True, countrycolor="RebeccaPurple",
-            showland=True, landcolor="rgb(243, 243, 243)",
-            lataxis_range=[-50, 80], lonaxis_range=[-150, 180]
-        )
-        fig_map.update_layout(height=500, margin=dict(l=0, r=0, t=30, b=0), legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01))
-        st.plotly_chart(fig_map, use_container_width=True)
+            fig_map.update_geos(
+                projection_type="natural earth",
+                showcountries=True, countrycolor="RebeccaPurple",
+                showland=True, landcolor="rgb(243, 243, 243)",
+                lataxis_range=[min(o_lat, d_lat, detour_lat)-20, max(o_lat, d_lat, detour_lat)+20], 
+                lonaxis_range=[min(o_lon, d_lon, detour_lon)-20, max(o_lon, d_lon, detour_lon)+20]
+            )
+            fig_map.update_layout(height=500, margin=dict(l=0, r=0, t=30, b=0), legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01))
+            st.plotly_chart(fig_map, use_container_width=True)
 
-        map_col1, map_col2 = st.columns(2)
-        with map_col1:
-            st.error(f"### 🚨 原訂航線風險警告 ({origin[:3]} ✈️ {destination[:3]})")
-            st.markdown(f"""
-            **影響空域：** 座標 ({mid_lat:.1f}, {mid_lon:.1f}) 周邊 500 海浬
-            - **🚩 地空飛彈威脅 (SAM)：** 該區域近期有未經公告之防空飛彈活動，存在誤擊民航機之極高風險。
-            - **📡 GPS 欺騙干擾 (Spoofing)：** 近 48 小時內接獲多起民航機回報，該空域存在軍用級 GPS 訊號覆寫。
-            - **📜 法規限制：** 主管機關已發布 NOTAM，強烈建議民航機避開此管制區。
-            """)
-            st.button("❌ 拒絕此航線 (Deny Route)", type="primary")
+            map_col1, map_col2 = st.columns(2)
+            with map_col1:
+                st.error(f"### 🚨 原訂航線風險警告 ({origin_input[:5]} ✈️ {dest_input[:5]})")
+                st.markdown(f"""
+                **影響空域：** 座標 ({mid_lat:.2f}, {mid_lon:.2f}) 周邊 500 海浬
+                - **🚩 地空威脅：** 該區域近期有未經公告之防空活動，存在極高風險。
+                - **📡 GPS 欺騙干擾：** 近 48 小時內接獲多起回報，該空域存在訊號覆寫。
+                - **📜 法規限制：** 主管機關已發布 NOTAM，強烈建議民航機避開此管制區。
+                """)
+                st.button("❌ 拒絕此航線 (Deny Route)", type="primary")
 
-        with map_col2:
-            st.success("### ✅ 系統建議：啟用動態安全繞道航線")
-            st.markdown("""
-            **改道路徑：** 系統已自動計算偏置航路 (Offset Route) 避開高風險管制區。
-            - **🛡️ 飛安評估：** 避開所有交戰區，導航訊號穩定，天候狀況良好。
-            """)
-            
-            st.markdown("#### 💰 繞道營運成本評估 (Delta Cost)")
-            c1, c2, c3 = st.columns(3)
-            c1.metric("增加飛行時間", f"+ {np.random.randint(45, 120)} 分鐘", delta_color="inverse")
-            c2.metric("額外燃油消耗", f"+ {np.random.randint(5, 18)} 噸", delta_color="inverse")
-            c3.metric("航班準點率影響", "延遲抵達", delta_color="inverse")
-            
-            st.button("✅ 批准並重新簽派 (Approve & Dispatch)")
+            with map_col2:
+                st.success("### ✅ 系統建議：啟用動態安全繞道航線")
+                st.markdown("""
+                **改道路徑：** 系統已自動計算偏置航路 (Offset Route) 避開高風險管制區。
+                - **🛡️ 飛安評估：** 避開交戰與干擾熱區，導航訊號穩定。
+                """)
+                
+                rough_dist = np.sqrt((o_lat-d_lat)**2 + (o_lon-d_lon)**2)
+                delay_mins = int(rough_dist * 1.5 + np.random.randint(20, 45))
+                fuel_tons = round(delay_mins * 0.15, 1)
+
+                st.markdown("#### 💰 繞道營運成本評估 (Delta Cost)")
+                c1, c2, c3 = st.columns(3)
+                c1.metric("增加飛行時間", f"+ {delay_mins} 分鐘", delta_color="inverse")
+                c2.metric("額外燃油消耗", f"+ {fuel_tons} 噸", delta_color="inverse")
+                c3.metric("航班準點率影響", "延遲抵達", delta_color="inverse")
+                
+                st.button("✅ 批准並重新簽派 (Approve & Dispatch)")
