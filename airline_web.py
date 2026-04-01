@@ -16,9 +16,9 @@ st.sidebar.header("📅 營運指標數據輸入")
 st.sidebar.subheader("【本年度 (Current Year)】")
 st.sidebar.markdown("*請利用滑桿調整當前營運分數 (0-100)*")
 curr_safety = st.sidebar.slider("1. 飛安控管 (今年)", 0.0, 100.0, 75.0, step=1.0)
-curr_maint = st.sidebar.slider("2. 機隊維修 (今年)", 0.0, 100.0, 15.0, step=1.0) # 預設拉低看紅色效果
+curr_maint = st.sidebar.slider("2. 機隊維修 (今年)", 0.0, 100.0, 15.0, step=1.0)
 curr_otp = st.sidebar.slider("3. 航班調度 (今年)", 0.0, 100.0, 85.0, step=1.0)
-curr_service = st.sidebar.slider("4. 旅客服務 (今年)", 0.0, 100.0, 100.0, step=1.0) # 預設拉滿看綠色效果
+curr_service = st.sidebar.slider("4. 旅客服務 (今年)", 0.0, 100.0, 100.0, step=1.0)
 
 st.sidebar.divider()
 
@@ -45,7 +45,7 @@ urgency_scores = {}
 total_urgency = 0
 
 for cat, score in scores_dict.items():
-    gap = max(100.0 - score, 1.0) # 確保即使100分也保留極小權重進行維運
+    gap = max(100.0 - score, 1.0)
     urg = gap * weights[cat]
     urgency_scores[cat] = urg
     total_urgency += urg
@@ -61,14 +61,14 @@ with col1:
     st.subheader("🔄 年度營運體質對比雷達圖")
     fig = go.Figure()
 
-    # 繪製前年度數據 (淺灰色填滿)
+    # 繪製前年度數據
     fig.add_trace(go.Scatterpolar(
         r=prev_scores + [prev_scores[0]], theta=categories + [categories[0]],
         fill='toself', name='前年度 (Last Year)',
         line_color='rgba(150, 150, 150, 0.5)', fillcolor='rgba(200, 200, 200, 0.3)'
     ))
 
-    # 繪製本年度數據 (藍色粗線)
+    # 繪製本年度數據
     fig.add_trace(go.Scatterpolar(
         r=curr_scores + [curr_scores[0]], theta=categories + [categories[0]],
         fill='toself', name='本年度 (Current Year)',
@@ -91,32 +91,26 @@ with col2:
             st.write("---")
 
 # ==========================================
-# 🛠️ 自訂 UI 元件：六級風險診斷卡片
+# 🛠️ 自訂 UI 元件：六級風險診斷卡片 (自動適應深淺色模式)
 # ==========================================
 def get_risk_level_config(score):
-    """根據分數返回風險等級名稱與顏色設定"""
+    """根據分數返回: (風險等級, 主題色, 判定文字)"""
     if score == 100.0:
-        return ('perfect', "#002d04", "#2ecc71", "#155724", "🏆 卓越典範 (PERFECT) —— 系統處於理想狀態，維持卓越並分享經驗")
+        return ('perfect', "#00d26a", "🏆 卓越典範 (PERFECT) —— 系統處於理想狀態，維持卓越並分享經驗")
     elif score >= 81.0:
-        return ('stable', "#002b12", "#a3e635", "#155724", "✅ 安全穩定 (STABLE) —— 績效優良，持續精益求精與深化文化")
+        return ('stable', "#28a745", "✅ 安全穩定 (STABLE) —— 績效優良，持續精益求精與深化文化")
     elif score >= 61.0:
-        return ('caution', "#332b00", "#f1c40f", "#856404", "⚠️ 黃色警戒 (CAUTION) —— 績效輕微下滑，需啟動主動式數據監測")
+        return ('caution', "#ffc107", "⚠️ 黃色警戒 (CAUTION) —— 績效輕微下滑，需啟動主動式數據監測")
     elif score >= 41.0:
-        return ('serious', "#4a1c00", "#e67e22", "#fff3cd", "🟠 橘色風險 (SERIOUS) —— 存在組織性漏洞，需深度重整與系統性對策")
+        return ('serious', "#fd7e14", "🟠 橘色風險 (SERIOUS) —— 存在組織性漏洞，需深度重整與系統性對策")
     elif score >= 21.0:
-        return ('high_risk', "#5a0000", "#e74c3c", "#f8d7da", "🔴 紅色高危 (HIGH RISK) —— 系統防禦失效，需立即介入與危機處置")
+        return ('high_risk', "#e74c3c", "🔴 紅色高危 (HIGH RISK) —— 系統防禦失效，需立即介入與危機處置")
     else: # 0-20
-        return ('catastrophic', "#3a0000", "#dc2626", "#fee2e2", "🚨 災難崩潰 (CATASTROPHIC) —— 組織機能癱瘓，立即停止營運並全面重審")
+        return ('catastrophic', "#ff3333", "🚨 災難崩潰 (CATASTROPHIC) —— 組織機能癱瘓，立即停止營運並全面重審")
 
 def render_diagnosis_card(category, score, delta):
-    # 取得六級風險定義
-    level, dark_bg, border_color, light_text, status_text = get_risk_level_config(score)
+    level, main_color, status_text = get_risk_level_config(score)
     
-    # 根據 Streamlit 主題自動適應背景色
-    is_dark_theme = st.get_option("theme.base") == "dark"
-    bg_color = dark_bg if is_dark_theme else border_color + "15" # 淺色模式下用亮色半透明
-    text_color = border_color if is_dark_theme else "#111111"
-
     # 動態趨勢評語
     if delta >= 10: trend_label = f"📈 跨越式進步 (+{delta:.1f})"
     elif delta > 0: trend_label = f"↗️ 微幅進步 (+{delta:.1f})"
@@ -124,11 +118,17 @@ def render_diagnosis_card(category, score, delta):
     elif delta < 0: trend_label = f"↘️ 微幅下滑 ({delta:.1f})"
     else: trend_label = "➖ 表現持平"
 
-    # 渲染卡片標頭
+    # 使用 Streamlit 內建 CSS 變數 var(--text-color) 讓文字自動適應黑/白底色
+    # main_color + "20" 是一種網頁設計高級技巧，代表在原本的顏色上加上 12.5% 的透明度作為背景
+    bg_color = main_color + "20" 
+
     st.markdown(f"""
-    <div style="background-color:{bg_color}; padding:20px; border-radius:10px; border-left: 10px solid {border_color}; margin-top: 20px; margin-bottom: 15px;">
-        <h3 style="color:{text_color}; margin-top:0;">{cat} | 本年得分：<span style="font-size: 1.3em; font-weight: 900;">{score:.1f}</span> ({trend_label})</h3>
-        <p style="color:{text_color}; font-weight:bold; font-size: 1.1em; margin-bottom:0;">判定：{status_text}</p>
+    <div style="background-color:{bg_color}; padding:20px; border-radius:10px; border-left: 10px solid {main_color}; margin-top: 20px; margin-bottom: 15px;">
+        <h3 style="color: var(--text-color); margin-top:0;">
+            {category} | 本年得分：<span style="color:{main_color}; font-size: 1.3em; font-weight: 900;">{score:.1f}</span> 
+            <span style="font-size: 0.65em; font-weight: normal; opacity: 0.8;">({trend_label})</span>
+        </h3>
+        <p style="color: var(--text-color); font-weight:bold; font-size: 1.1em; margin-bottom:0;">判定：<span style="color:{main_color};">{status_text}</span></p>
     </div>
     """, unsafe_allow_html=True)
     return level
@@ -139,7 +139,7 @@ def render_diagnosis_card(category, score, delta):
 knowledge_base = {
     '飛安控管': {
         'catastrophic': { 'reasons': ["安全管理系統 (SMS) 徹底癱瘓，內部甚至出現刻意隱瞞違規之現象。", "組織失去對風險的任何感知能力，隨時可能發生重大空難。"], 'actions': ["🚨 **[立即指令]** 總經理下令全機隊立即停飛，所有簽派與飛航作業強制暫停，等待外部聯合專案組進駐稽核。", "🚨 **[組織重整]** 解散現有安委會，凍結相關主管職權，重新考核核心關鍵崗位人員之飛安意識。"] },
-        'high_risk': { 'reasons': ["防禦機制出現多重失效，「瑞士起司理論」漏洞穿透组织各層級。", "基層對「公正文化」完全失去信任，自願通報機制斷絕。"], 'actions': ["⚠️ **[危機處置]** 暫停高風險/易受天候影響航線運行，啟動無預警全機隊安全停飛檢查 (Stand-down)。", "⚠️ **[系統重審]** 全面盤點 SMS 運作狀況，重新驗證飛行員執照考勤與疲勞管理 (FRMS) 指標是否失真。"] },
+        'high_risk': { 'reasons': ["防禦機制出現多重失效，「瑞士起司理論」漏洞穿透組織各層級。", "基層對「公正文化」完全失去信任，自願通報機制斷絕。"], 'actions': ["⚠️ **[危機處置]** 暫停高風險/易受天候影響航線運行，啟動無預警全機隊安全停飛檢查 (Stand-down)。", "⚠️ **[系統重審]** 全面盤點 SMS 運作狀況，重新驗證飛行員執照考勤與疲勞管理 (FRMS) 指標是否失真。"] },
         'serious': { 'reasons': ["存在組織性「孤島效應」，機務、航務與簽派數據無法有效橫向整合。", "SMS 退化為被動式的「事後檢討機制」，缺乏主動預測能力。"], 'actions': ["**[深度對策]** 成立總經理直屬專案小組，強制打通跨部門飛航數據壁壘。", "**[風險危害]** 針對輕微異常事件 (Incidents) 進行根本原因分析 (RCA)，找出組織層級的系統性漏洞。"] },
         'caution': { 'reasons': ["飛行員面臨潛在的疲勞累積，情境警覺 (Situational Awareness) 開始下滑。", "組員資源管理 (CRM) 訓練成效降低，駕駛艙內質疑權威能力轉弱。"], 'actions': ["**[主動監控]** 擴大 FOQA 飛行數據監測之分析深度，設定重落地、超速等偏差行為之嚴格警報門檻。", "**[組員資源]** 針對全體機師辦理「CRM 高階複訓」，強化面對複雜情境下的溝通效率與共同決策能力。"] },
         'stable': { 'reasons': ["防禦機制運作良好，數據監控與人員訓練均達標。"], 'actions': ["**[精益求精]** 系統運作穩健。請鼓勵公正文化 (Just Culture) 自願通報，找出隱藏在優良數據下的微小偏差。"] },
@@ -155,7 +155,7 @@ knowledge_base = {
     },
     '航班調度': {
         'catastrophic': { 'reasons': ["時刻表與真實運能量嚴重錯配，造成大規模延誤與機組員嚴重超時。", "調度機能癱瘓，缺乏任何抗壓性。"], 'actions': ["🚨 **[立即指令]** 總經理下令強制取消該部門自行編排之所有航班時刻表，改用最低運能保障版時刻表。", "🚨 **[重大調整]** 徹換該部門核心管理團隊，並全面盤點組員疲勞與機隊妥善率缺口，策略性縮減營運網。"] },
-        'high_risk': { 'reasons': ["时刻表毫無緩衝裕度 (Buffer Time)，雷雨季時缺乏因應手段導致航網崩潰。", "未科學計算備用機 (Spare Aircraft) 與待命組員 (Standby) 指派基數。"], 'actions': ["⚠️ **[危機處置]** 立即砍減延誤率常態性超過 40% 的『紙上航班』。", "⚠️ **[資源補足]** 動用緊急預算召回休假人員並應用數據模型重新精算備用機配置，在重點機場增加待命量能。"] },
+        'high_risk': { 'reasons': ["時刻表毫無緩衝裕度 (Buffer Time)，雷雨季時缺乏因應手段導致航網崩潰。", "未科學計算備用機 (Spare Aircraft) 與待命組員 (Standby) 指派基數。"], 'actions': ["⚠️ **[危機處置]** 立即砍減延誤率常態性超過 40% 的『紙上航班』。", "⚠️ **[資源補足]** 動用緊急預算召回休假人員並應用數據模型重新精算備用機配置，在重點機場增加待命量能。"] },
         'serious': { 'reasons': ["簽派、機務與地勤之間的資訊傳遞存在嚴重時間差。", "缺乏突發事件的動態調度靈活度。"], 'actions': ["**[深度對策]** 重新繪製地停作業的甘特圖，精算並壓縮關鍵路徑 (Critical Path) 上的閒置時間。", "**[協同決策]** 建立 A-CDM (機場協同決策) 數據連線，提前預判流量管制。"] },
         'caution': { 'reasons': ["地停作業效率不彰，未能緊密銜接。"], 'actions': ["**[效率優化]** 重新優化飛機地停轉場流程（加油、上餐、清潔），並針對特定長程航班進行飛行計畫的燃油經濟性最佳化。"] },
         'stable': { 'reasons': ["準點率良好，抗壓性佳。"], 'actions': ["**[精益求精]** 維持高準點率紀錄，並試圖優化飛行路線降低燃油消耗。"] },
