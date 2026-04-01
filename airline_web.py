@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 st.set_page_config(page_title="航空公司營運診斷系統", layout="wide")
 
 st.title("✈️ 航空公司營運診斷與趨勢最佳化系統")
-st.markdown("本系統已啟用 **六級風險色帶管理機制** 與 **深度根因分析行動書**。")
+st.markdown("本系統已啟用 **六級風險色帶管理機制** 與 **深度根因分析行動書**，支援全環境深淺色自適應顯示。")
 
 # ==========================================
 # 網頁側邊欄 (數據輸入區)
@@ -91,7 +91,7 @@ with col2:
             st.write("---")
 
 # ==========================================
-# 🛠️ 自訂 UI 元件：六級風險診斷卡片 (自動適應深淺色模式)
+# 🛠️ 自訂 UI 元件：六級風險科技感透明卡片
 # ==========================================
 def get_risk_level_config(score):
     """根據分數返回: (風險等級, 主題色, 判定文字)"""
@@ -118,12 +118,9 @@ def render_diagnosis_card(category, score, delta):
     elif delta < 0: trend_label = f"↘️ 微幅下滑 ({delta:.1f})"
     else: trend_label = "➖ 表現持平"
 
-    # 使用 Streamlit 內建 CSS 變數 var(--text-color) 讓文字自動適應黑/白底色
-    # main_color + "20" 是一種網頁設計高級技巧，代表在原本的顏色上加上 12.5% 的透明度作為背景
-    bg_color = main_color + "20" 
-
+    # 【設計變更】: 拿掉泥巴色的背景，改用全透明背景 (transparent)，並加上微微發光的細邊框
     st.markdown(f"""
-    <div style="background-color:{bg_color}; padding:20px; border-radius:10px; border-left: 10px solid {main_color}; margin-top: 20px; margin-bottom: 15px;">
+    <div style="background-color: transparent; padding:20px; border-radius:10px; border: 1px solid {main_color}50; border-left: 8px solid {main_color}; margin-top: 20px; margin-bottom: 15px;">
         <h3 style="color: var(--text-color); margin-top:0;">
             {category} | 本年得分：<span style="color:{main_color}; font-size: 1.3em; font-weight: 900;">{score:.1f}</span> 
             <span style="font-size: 0.65em; font-weight: normal; opacity: 0.8;">({trend_label})</span>
