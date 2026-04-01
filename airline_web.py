@@ -5,13 +5,14 @@ import plotly.graph_objects as go
 import plotly.express as px
 from scipy.optimize import minimize
 import datetime
+import requests
 from geopy.geocoders import Nominatim
 
 # 設定網頁版面 (寬版)
 st.set_page_config(page_title="航空公司營運戰情室", layout="wide")
 
 st.title("✈️ 航空公司營運戰情室 (Aviation War Room)")
-st.markdown("整合 **六級風險深度診斷**、**作業研究最佳化**、**長期趨勢預測** 與 **全球動態航線風險評估** 的決策支援系統。")
+st.markdown("整合 **六級風險深度診斷**、**作業研究最佳化**、**長期趨勢預測** 與 **全球動態航線風險評估 (含 Live API)** 的決策支援系統。")
 
 # ==========================================
 # 網頁側邊欄 (數據輸入)
@@ -198,7 +199,7 @@ with tab2:
         df_trend = pd.DataFrame({'年份': years, '飛安控管': [92, 88, 85, prev_safety, curr_safety], '機隊維修': [80, 75, 65, prev_maint, curr_maint], '航班調度': [88, 85, 82, prev_otp, curr_otp], '旅客服務': [85, 90, 92, prev_service, curr_service]})
     
     df_melted = df_trend.melt(id_vars=['年份'], var_name='營運指標', value_name='分數')
-    fig_line = px.line(df_melted, x='年份', y='分數', color='營運指標', markers=True)
+    fig_line = px.line(df_melted, x='年份', y='分數', color='營運指標', markers=True, title='各項營運指標長期趨勢追蹤') # 補回圖表大標題！
     fig_line.update_layout(yaxis=dict(range=[0, 100]))
     st.plotly_chart(fig_line, use_container_width=True)
     
@@ -238,20 +239,43 @@ with tab3:
                 growth = predicted_scores[i] - curr_scores[i]
                 st.metric(label=f"預測 {cat} 分數", value=f"{predicted_scores[i]:.1f} 分", delta=f"預期成長 {growth:+.1f} 分")
 
-with tab4:
-    st.subheader("🌍 全球動態航線風險評估與重飛計畫")
-    st.markdown("結合下拉選單與地理編碼系統 (Geocoding API)，您可以選擇預設機場，或自行輸入全球任何地名。")
-    
-    @st.cache_data(show_spinner=False)
-    def get_lat_lon(location_name):
-        try:
-            geolocator = Nominatim(user_agent="airline_dashboard_v2")
-            loc = geolocator.geocode(location_name, timeout=10)
-            if loc: return loc.latitude, loc.longitude
-            return None, None
-        except: return None, None
+# ==========================================
+# API 串接模組：擷取即時天氣與地定位
+# ==========================================
+@st.cache_data(show_spinner=False)
+def get_lat_lon(location_name):
+    try:
+        geolocator = Nominatim(user_agent="airline_dashboard_v3")
+        loc = geolocator.geocode(location_name, timeout=10)
+        if loc: return loc.latitude, loc.longitude
+        return None, None
+    except: return None, None
 
-    # 智慧雙模輸入：提供下拉選單，並包含「自行輸入」選項
+@st.cache_data(ttl=600, show_spinner=False)
+def get_live_weather(lat, lon):
+    try:
+        url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,wind_speed_10m,weather_code&wind_speed_unit=kn"
+        res = requests.get(url, timeout=5).json()
+        curr = res.get('current', {})
+        wind_kt = curr.get('wind_speed_10m', "N/A")
+        temp_c = curr.get('temperature_2m', "N/A")
+        
+        code = curr.get('weather_code', 0)
+        if code in [0, 1, 2, 3]: condition = "晴朗/多雲 🌤️"
+        elif code in [45, 48]: condition = "濃霧視障 🌫️"
+        elif code in [51, 53, 55, 61, 63, 65, 80, 81, 82]: condition = "降雨/陣雨 🌧️"
+        elif code in [71, 73, 75, 77, 85, 86]: condition = "降雪 ❄️"
+        elif code in [95, 96, 99]: condition = "雷暴/極端不穩定 ⛈️"
+        else: condition = "未知氣候"
+            
+        return wind_kt, temp_c, condition
+    except:
+        return "連線失敗", "連線失敗", "資料無法取得"
+
+with tab4:
+    st.subheader("🌍 全球動態航線風險評估 (Live API 串接版)")
+    st.markdown("系統已成功串接 **Geocoding API (地理定位)** 與 **Open-Meteo API (即時衛星氣象)**。將針對航線中繼點進行真實環境數據抓取。")
+    
     airport_presets = [
         "TPE (台北 桃園機場)", "NRT (東京 成田機場)", "SIN (新加坡 樟宜機場)",
         "FRA (法蘭克福機場)", "LHR (倫敦 希斯洛機場)", "JFK (紐約 甘迺迪機場)",
@@ -274,21 +298,22 @@ with tab4:
             dest_input = dest_sel
 
     if origin_input and dest_input:
-        with st.spinner('📡 正在透過全球衛星系統定位座標中...'):
+        with st.spinner('📡 正在透過全球衛星系統定位座標並抓取情報中...'):
             o_lat, o_lon = get_lat_lon(origin_input)
             d_lat, d_lon = get_lat_lon(dest_input)
 
         if o_lat is None:
-            st.error(f"❌ 找不到起飛地點「{origin_input}」的座標，請嘗試輸入更完整的名稱。")
+            st.error(f"❌ 找不到起飛地點「{origin_input}」的座標。")
         elif d_lat is None:
-            st.error(f"❌ 找不到降落地點「{dest_input}」的座標，請嘗試輸入更完整的名稱。")
+            st.error(f"❌ 找不到降落地點「{dest_input}」的座標。")
         elif o_lat == d_lat and o_lon == d_lon:
             st.warning("⚠️ 起飛與降落地點過於接近或相同，無法計算航線。")
         else:
             mid_lat = (o_lat + d_lat) / 2
             mid_lon = (o_lon + d_lon) / 2
+            
+            live_wind, live_temp, live_cond = get_live_weather(mid_lat, mid_lon)
 
-            # 動態產生安全繞飛點
             detour_lat = max(min(mid_lat - 15, 89.0), -89.0)
             detour_lon = mid_lon + 15
             if detour_lon > 180: detour_lon -= 360
@@ -326,19 +351,24 @@ with tab4:
 
             map_col1, map_col2 = st.columns(2)
             with map_col1:
-                st.error(f"### 🚨 原訂航線風險警告 ({origin_input[:5]} ✈️ {dest_input[:5]})")
+                st.error(f"### 🚨 航線綜合風險情報 ({origin_input[:5]} ✈️ {dest_input[:5]})")
+                
                 st.markdown(f"""
-                **影響空域：** 座標 ({mid_lat:.2f}, {mid_lon:.2f}) 周邊 500 海浬
-                - **🚩 地空威脅：** 該區域近期有未經公告之防空活動，存在極高風險。
-                - **📡 GPS 欺騙干擾：** 近 48 小時內接獲多起回報，該空域存在訊號覆寫。
-                - **📜 法規限制：** 主管機關已發布 NOTAM，強烈建議民航機避開此管制區。
+                **⚠️ 實時氣象觀測 (Live API Data)：** 座標 ({mid_lat:.2f}, {mid_lon:.2f}) 
+                - **當前氣候狀態：** {live_cond}
+                - **地表風速：** {live_wind} knots (節)
+                - **環境溫度：** {live_temp} °C
+                
+                **🚩 地緣政治與飛安情報 (Simulated)：** 周邊 500 海浬
+                - **飛彈活動 (Missile Threats)：** 該區域存在未經公告之軍事演習或長程飛彈試射，極高誤擊風險。
+                - **GPS 欺騙干擾：** 近 48 小時內接獲多起訊號覆寫回報。
                 """)
                 st.button("❌ 拒絕此航線 (Deny Route)", type="primary")
 
             with map_col2:
                 st.success("### ✅ 系統建議：啟用動態安全繞道航線")
                 st.markdown("""
-                **改道路徑：** 系統已自動計算偏置航路 (Offset Route) 避開高風險管制區。
+                **改道路徑：** 系統已自動計算偏置航路避開高風險管制區，防止潛在的系統性失效點對齊。
                 - **🛡️ 飛安評估：** 避開交戰與干擾熱區，導航訊號穩定。
                 """)
                 
