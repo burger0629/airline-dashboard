@@ -1,12 +1,8 @@
 import streamlit as st
 import numpy as np
-import matplotlib.pyplot as plt
-from math import pi
-import matplotlib
+import plotly.graph_objects as go
 
-# 設定中文字型與版面
-plt.rcParams['font.sans-serif'] = ['Microsoft JhengHei'] 
-plt.rcParams['axes.unicode_minus'] = False
+# 設定網頁版面
 st.set_page_config(page_title="航空公司營運診斷系統", layout="wide")
 
 # ==========================================
@@ -52,37 +48,49 @@ for category in urgency_scores:
 # ==========================================
 col1, col2 = st.columns(2)
 
-# 左側：雷達圖
+# 左側：【升級版】 Plotly 互動式雷達圖
 with col1:
     st.subheader("營運健康診斷雷達圖")
     categories = list(scores.keys())
     values = list(scores.values())
-    values += values[:1]
-    N = len(categories)
-    angles = [n / float(N) * 2 * pi for n in range(N)]
-    angles += angles[:1]
 
-    fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
-    plt.xticks(angles[:-1], categories, size=12, fontweight='bold')
-    ax.set_rlabel_position(0)
-    plt.yticks([20, 40, 60, 80, 100], ["20", "40", "60", "80", "100"], color="grey", size=10)
-    plt.ylim(0, 100)
-
-    ax.plot(angles, values, linewidth=2, linestyle='solid', color='blue', label='當前營運體質')
-    ax.fill(angles, values, 'blue', alpha=0.2)
-    target_values = [100] * N + [100]
-    ax.plot(angles, target_values, linewidth=1.5, linestyle='--', color='green', label='目標最佳化狀態')
-    plt.legend(loc='upper right', bbox_to_anchor=(1.3, 1.1))
+    fig = go.Figure()
     
-    # 將 matplotlib 的圖表顯示在網頁上
-    st.pyplot(fig)
+    # 畫出當前體質
+    fig.add_trace(go.Scatterpolar(
+        r=values + [values[0]], # 數值接回起點讓多邊形閉合
+        theta=categories + [categories[0]],
+        fill='toself',
+        name='當前營運體質',
+        line_color='royalblue'
+    ))
+
+    # 畫出 100 分目標線
+    fig.add_trace(go.Scatterpolar(
+        r=[100, 100, 100, 100, 100],
+        theta=categories + [categories[0]],
+        fill=None,
+        name='目標最佳化狀態',
+        line_color='mediumseagreen',
+        line_dash='dash'
+    ))
+
+    fig.update_layout(
+        polar=dict(
+            radialaxis=dict(visible=True, range=[0, 100])
+        ),
+        showlegend=True,
+        margin=dict(l=40, r=40, t=20, b=20)
+    )
+    
+    # 將 Plotly 圖表顯示在網頁上
+    st.plotly_chart(fig, use_container_width=True)
 
 # 右側：財務分配與決策建議
 with col2:
     st.subheader("💡 最佳化預算分配建議")
     st.info(f"**本年度總預算： {total_budget_millions:,.1f} 百萬台幣**")
     
-    # 用迴圈印出每個項目的分配金額
     for category in scores:
         st.metric(label=f"{category} (當前 {scores[category]:.1f} 分)", 
                   value=f"{allocations[category]:.1f} 百萬")
@@ -93,6 +101,9 @@ with col2:
     st.warning(f"最大營運缺口落在 **【{max_budget_category}】**，系統已自動將最大宗資源排程至此項目。")
     
     if score_safety < 80:
+        st.error("🚨 **飛安警報**：飛安控管分數低於 80 分，處於高風險狀態。請務必優先執行飛安預算配置，並啟動 SMS 專案審查。")
+    else:
+        st.success("✅ 飛安指標處於穩定水準。")
         st.error("🚨 **飛安警報**：飛安控管分數低於 80 分，處於高風險狀態。請務必優先執行飛安預算配置，並啟動 SMS 專案審查。")
     else:
         st.success("✅ 飛安指標處於穩定水準。")
