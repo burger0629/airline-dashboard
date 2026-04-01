@@ -39,7 +39,7 @@ curr_scores = np.array([curr_safety, curr_maint, curr_otp, curr_service])
 prev_scores = np.array([prev_safety, prev_maint, prev_otp, prev_service])
 
 # ==========================================
-# 核心演算法：最佳化分配
+# 核心演算法：線性/非線性最佳化 (LP/NLP)
 # ==========================================
 def objective(x, current_scores, weights):
     k_factors = np.array([1.5, 2.0, 1.2, 1.0])
@@ -57,7 +57,32 @@ allocations = result.x if result.success else initial_guess
 alloc_dict = {cat: alloc for cat, alloc in zip(categories, allocations)}
 
 # ==========================================
-# UI 元件設定
+# 一鍵匯出報表功能 (回歸！)
+# ==========================================
+report_content = f"""# 航空公司年度營運診斷與資源最佳化報告
+**報告生成時間：** {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+**總可用預算：** {total_budget} 百萬台幣
+
+## 一、 年度指標進退步分析
+"""
+for i, cat in enumerate(categories):
+    delta = curr_scores[i] - prev_scores[i]
+    report_content += f"- **{cat}**：本年 {curr_scores[i]:.1f} 分 (去年 {prev_scores[i]:.1f} 分) | 變動：{delta:+.1f} 分\n"
+
+report_content += "\n## 二、 最佳化預算配置建議\n"
+for cat, alloc in alloc_dict.items():
+    report_content += f"- **{cat}**：建議投入 {alloc:.1f} 百萬台幣\n"
+
+st.sidebar.divider()
+st.sidebar.download_button(
+    label="📄 匯出年度營運診斷書 (Report)", 
+    data=report_content, 
+    file_name="Airline_Operations_Report.md", 
+    mime="text/markdown"
+)
+
+# ==========================================
+# UI 元件與六級知識庫設定
 # ==========================================
 def get_risk_level_config(score):
     if score == 100.0: return ('perfect', "#00d26a", "🏆 卓越典範 (PERFECT) —— 系統處於理想狀態，維持卓越並分享經驗")
@@ -87,9 +112,6 @@ def render_diagnosis_card(category, score, delta):
     """, unsafe_allow_html=True)
     return level
 
-# ==========================================
-# 🚀 完整回歸：六級深度專家知識庫
-# ==========================================
 knowledge_base = {
     '飛安控管': {
         'catastrophic': { 'reasons': ["安全管理系統 (SMS) 徹底癱瘓，內部甚至出現刻意隱瞞違規之現象。", "組織失去對風險的任何感知能力，隨時可能發生重大空難。"], 'actions': ["🚨 **[立即指令]** 總經理下令全機隊立即停飛，所有簽派與飛航作業強制暫停，等待外部聯合專案組進駐稽核。", "🚨 **[組織重整]** 解散現有安委會，凍結相關主管職權，重新考核核心關鍵崗位人員之飛安意識。"] },
@@ -128,7 +150,7 @@ knowledge_base = {
 # ==========================================
 # 建立頁籤架構 (Tabs) 
 # ==========================================
-tab1, tab2, tab3, tab4 = st.tabs(["📊 核心診斷分配", "📈 長期趨勢", "🔮 沙盤推演", "🌍 航線風險評估 (動態自選)"])
+tab1, tab2, tab3, tab4 = st.tabs(["📊 核心診斷分配", "📈 長期趨勢 (檔案匯入)", "🔮 沙盤推演 (預測)", "🌍 航線風險評估 (自選)"])
 
 with tab1:
     col1, col2 = st.columns([1.2, 1])
@@ -169,45 +191,76 @@ with tab1:
             st.markdown("<br>", unsafe_allow_html=True)
 
 with tab2:
+    # 歷史營運資料與CSV上傳功能 (回歸！)
     st.subheader("📈 歷史營運數據趨勢分析 (五年期)")
-    years = ['2022', '2023', '2024', '2025', '2026(YTD)']
-    df_trend = pd.DataFrame({'年份': years, '飛安控管': [92, 88, 85, prev_safety, curr_safety], '機隊維修': [80, 75, 65, prev_maint, curr_maint], '航班調度': [88, 85, 82, prev_otp, curr_otp], '旅客服務': [85, 90, 92, prev_service, curr_service]})
+    st.markdown("您可以上傳包含歷史數據的 CSV 檔案，或查看系統預設的模擬數據。")
+    
+    uploaded_file = st.file_uploader("📂 上傳歷史營運數據 (CSV)", type="csv")
+    
+    if uploaded_file is not None:
+        df_trend = pd.read_csv(uploaded_file)
+        st.success("檔案讀取成功！")
+    else:
+        years = ['2022', '2023', '2024', '2025', '2026(YTD)']
+        df_trend = pd.DataFrame({
+            '年份': years,
+            '飛安控管': [92, 88, 85, prev_safety, curr_safety],
+            '機隊維修': [80, 75, 65, prev_maint, curr_maint],
+            '航班調度': [88, 85, 82, prev_otp, curr_otp],
+            '旅客服務': [85, 90, 92, prev_service, curr_service]
+        })
+    
+    # 繪製五年歷史趨勢折線圖
     df_melted = df_trend.melt(id_vars=['年份'], var_name='營運指標', value_name='分數')
-    fig_line = px.line(df_melted, x='年份', y='分數', color='營運指標', markers=True)
+    fig_line = px.line(df_melted, x='年份', y='分數', color='營運指標', markers=True, title='各項營運指標長期趨勢追蹤')
     fig_line.update_layout(yaxis=dict(range=[0, 100]))
     st.plotly_chart(fig_line, use_container_width=True)
+    
+    with st.expander("📄 查看詳細數據表格"):
+        st.dataframe(df_trend, use_container_width=True)
 
 with tab3:
+    # 沙盤推演與預測模型 (回歸！)
     st.subheader("🔮 決策沙盤推演 (What-If Simulator)")
+    st.markdown("手動調配預算，系統將利用 **邊際效益遞減模型** 反向推算明年度的預期營運分數。")
     st.info(f"您目前共有 **{total_budget} 百萬** 的籌碼可以分配。")
+    
     sim_cols = st.columns(4)
     sim_allocs = []
     for i, cat in enumerate(categories):
         with sim_cols[i]:
-            val = st.number_input(f"投入【{cat}】", min_value=0.0, max_value=float(total_budget), value=float(alloc_dict[cat]), step=10.0, key=f"sim_{i}")
+            val = st.number_input(f"投入【{cat}】(百萬)", min_value=0.0, max_value=float(total_budget), value=float(alloc_dict[cat]), step=10.0, key=f"sim_{i}")
             sim_allocs.append(val)
             
     total_sim = sum(sim_allocs)
     if total_sim > total_budget:
-        st.error(f"⚠️ 預算超支！您分配了 {total_sim} 百萬。")
+        st.error(f"⚠️ 預算超支！您分配了 {total_sim} 百萬，但總預算只有 {total_budget} 百萬。")
     else:
+        st.success(f"預算分配完畢 (剩餘 {total_budget - total_sim} 百萬)。以下為系統預測之明年成績：")
+        
         k_factors = np.array([1.5, 2.0, 1.2, 1.0])
         predicted_scores = np.clip(curr_scores + k_factors * np.sqrt(sim_allocs), 0, 100)
         
+        # 繪製預測雷達圖
         fig_sim = go.Figure()
-        fig_sim.add_trace(go.Scatterpolar(r=list(curr_scores)+[curr_scores[0]], theta=categories+[categories[0]], fill='toself', name='本年度現況', line_color='rgba(150, 150, 150, 0.5)'))
-        fig_sim.add_trace(go.Scatterpolar(r=list(predicted_scores)+[predicted_scores[0]], theta=categories+[categories[0]], fill='toself', name='明年度預測', line_color='mediumseagreen', fillcolor='rgba(46, 204, 113, 0.3)'))
+        fig_sim.add_trace(go.Scatterpolar(r=list(curr_scores)+[curr_scores[0]], theta=categories+[categories[0]], fill='toself', name='本年度 (現況)', line_color='rgba(150, 150, 150, 0.5)'))
+        fig_sim.add_trace(go.Scatterpolar(r=list(predicted_scores)+[predicted_scores[0]], theta=categories+[categories[0]], fill='toself', name='明年度 (預測)', line_color='mediumseagreen', fillcolor='rgba(46, 204, 113, 0.3)'))
         fig_sim.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), margin=dict(l=40, r=40, t=30, b=30))
-        st.plotly_chart(fig_sim, use_container_width=True)
+        
+        sim_res_cols = st.columns([1, 1])
+        with sim_res_cols[0]:
+            st.plotly_chart(fig_sim, use_container_width=True)
+        with sim_res_cols[1]:
+            st.write("### 📈 預期效益分析")
+            for i, cat in enumerate(categories):
+                growth = predicted_scores[i] - curr_scores[i]
+                st.metric(label=f"預測 {cat} 分數", value=f"{predicted_scores[i]:.1f} 分", delta=f"預期成長 {growth:+.1f} 分")
 
-# ==========================================
-# 升級版模組：Tab 4 航線動態風險評估 (自選起降機場)
-# ==========================================
 with tab4:
+    # 航線風險評估模組 (包含下拉選單自訂起降)
     st.subheader("🌍 航線動態風險評估與重飛計畫 (Dynamic Routing)")
     st.markdown("串接全球情報與飛航公告 (NOTAMs)，動態計算航線衝突區並給予繞道成本評估。")
     
-    # 建立全球主要機場座標庫 (緯度, 經度)
     airport_db = {
         'TPE (台北 桃園)': (25.07, 121.23),
         'NRT (東京 成田)': (35.77, 140.39),
@@ -220,7 +273,6 @@ with tab4:
         'SYD (雪梨)': (-33.94, 151.17)
     }
 
-    # 起降機場選擇器
     route_col1, route_col2 = st.columns(2)
     with route_col1:
         origin = st.selectbox("🛫 起飛機場 (Origin)", list(airport_db.keys()), index=0)
@@ -233,26 +285,20 @@ with tab4:
         o_lat, o_lon = airport_db[origin]
         d_lat, d_lon = airport_db[destination]
 
-        # 數學計算：找出航線的中心點作為「模擬危險管制區」
         mid_lat = (o_lat + d_lat) / 2
         mid_lon = (o_lon + d_lon) / 2
 
-        # 數學計算：產生一個向外偏移的安全繞飛點 (Detour Waypoint)
-        # 簡單的偏移邏輯：緯度偏移15度，經度偏移10度
         detour_lat = mid_lat - 15 
         detour_lon = mid_lon + 10
 
-        # 地圖視覺化
         fig_map = go.Figure()
 
-        # 繪製動態生成的模擬危險管制區
         fig_map.add_trace(go.Scattergeo(
             lat=[mid_lat], lon=[mid_lon],
             marker=dict(size=90, color='red', opacity=0.3),
             name="🚨 模擬高風險管制區", mode="markers"
         ))
 
-        # 繪製原訂直飛航線 (紅色虛線)
         fig_map.add_trace(go.Scattergeo(
             lat=[o_lat, mid_lat, d_lat],
             lon=[o_lon, mid_lon, d_lon],
@@ -260,7 +306,6 @@ with tab4:
             name="原訂直飛航線 (高風險)", text=[origin[:3], "Danger Zone", destination[:3]], textposition="bottom center"
         ))
 
-        # 繪製安全繞道航線 (綠色實線)
         fig_map.add_trace(go.Scattergeo(
             lat=[o_lat, detour_lat, d_lat],
             lon=[o_lon, detour_lon, d_lon],
@@ -277,7 +322,6 @@ with tab4:
         fig_map.update_layout(height=500, margin=dict(l=0, r=0, t=30, b=0), legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01))
         st.plotly_chart(fig_map, use_container_width=True)
 
-        # 動態輸出風險報告與成本分析
         map_col1, map_col2 = st.columns(2)
         with map_col1:
             st.error(f"### 🚨 原訂航線風險警告 ({origin[:3]} ✈️ {destination[:3]})")
@@ -296,7 +340,6 @@ with tab4:
             - **🛡️ 飛安評估：** 避開所有交戰區，導航訊號穩定，天候狀況良好。
             """)
             
-            # 隨機產生一些增加的成本數字讓介面更逼真
             st.markdown("#### 💰 繞道營運成本評估 (Delta Cost)")
             c1, c2, c3 = st.columns(3)
             c1.metric("增加飛行時間", f"+ {np.random.randint(45, 120)} 分鐘", delta_color="inverse")
