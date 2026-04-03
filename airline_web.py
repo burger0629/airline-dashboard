@@ -504,13 +504,14 @@ elif st.session_state.get("authentication_status"):
                         from openai import OpenAI
                         client = OpenAI(api_key=api_key)
                         
+                        # 已經將全形引號替換為安全的半形引號與括號
                         system_prompt = f"""
-                        你是一位擁有 20 年經驗的「航空公司營運與飛航安全戰略幕僚」。
+                        你是一位擁有20年經驗的"航空公司營運與飛航安全戰略幕僚"。
                         你的說話風格專業、自然、具備同理心，就像一位真實存在的高階顧問。
                         
-                        【嚴格限制與職責】
-                        1. 領域限制：你的回答必須絕對限制在「航空營運、飛航安全管理系統 (SMS)、風險分析 (如瑞士起司模型)、機隊維修、航班調度」領域。如果使用者詢問如寫程式、旅遊景點、日常閒聊等無關問題，請禮貌拒絕並引導回航空營運主題。
-                        2. 數據支撐：請務必根據以下「戰情室即時數據」來提供客製化建議，不要只給空泛的理論：
+                        [嚴格限制與職責]
+                        1. 領域限制：你的回答必須絕對限制在"航空營運、飛航安全管理系統(SMS)、風險分析(如瑞士起司模型)、機隊維修、航班調度"領域。如果使用者詢問如寫程式、旅遊景點、日常閒聊等無關問題，請禮貌拒絕並引導回航空營運主題。
+                        2. 數據支撐：請務必根據以下"戰情室即時數據"來提供客製化建議，不要只給空泛的理論：
                            - 當前飛安控管評分：{curr_safety} / 100
                            - 當前機隊維修評分：{curr_maint} / 100
                            - 當前航班調度評分：{curr_otp} / 100
@@ -534,34 +535,6 @@ elif st.session_state.get("authentication_status"):
                     except Exception as e:
                         st.error("⚠️ 啟動 AI 幕僚失敗。請確認是否已填入正確的 API Key，或檢查網路連線。")
                         st.caption(f"錯誤代碼: {e}")
-                        你是一位擁有 20 年經驗的「航空公司營運與飛航安全戰略幕僚」。
-                        你的說話風格專業、自然、具備同理心，就像一位真實存在的高階顧問。
-                        
-                        【嚴格限制與職責】
-                        1. 領域限制：你的回答必須絕對限制在「航空營運、飛航安全管理系統 (SMS)、風險分析 (如瑞士起司模型)、機隊維修、航班調度」領域。如果使用者詢問如寫程式、旅遊景點、日常閒聊等無關問題，請禮貌拒絕並引導回航空營運主題。
-                        2. 數據支撐：請務必根據以下「戰情室即時數據」來提供客製化建議，不要只給空泛的理論：
-                           - 當前飛安控管評分：{curr_safety} / 100
-                           - 當前機隊維修評分：{curr_maint} / 100
-                           - 當前航班調度評分：{curr_otp} / 100
-                           - 當前旅客服務評分：{curr_service} / 100
-                           - 總經理可動用的總預算：{total_budget} 百萬台幣
-                           - 剩餘可用的維修工時：{max_labor_hours} 小時
-                        """
-                        
-                        # 呼叫 OpenAI API
-                        response = client.chat.completions.create(
-                            model="gpt-4o-mini", # 使用快速且便宜的模型
-                            messages=[
-                                {"role": "system", "content": system_prompt},
-                                {"role": "user", "content": uq}
-                            ],
-                            temperature=0.7 # 0.7 是一個很適合顧問角色的溫度值，不會太死板也不會亂發散
-                        )
-                        
-                        # 將 AI 的回答印出
-                        ai_reply = response.choices[0].message.content
-                        st.write(ai_reply)
-                        
                     except Exception as e:
                         st.error("⚠️ 啟動 AI 幕僚失敗。請確認是否已填入正確的 API Key，或檢查網路連線。")
                         st.caption(f"錯誤代碼: {e}")
