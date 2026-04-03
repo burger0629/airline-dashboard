@@ -490,12 +490,16 @@ elif st.session_state.get("authentication_status"):
         st.subheader("🤖 AI 戰略幕僚 (Virtual Advisor)")
         st.info(f"🧠 **系統 Context 已同步**：總預算 {total_budget}M, 最大工時 {max_labor_hours}H。分數：安{curr_safety}, 修{curr_maint}, 調{curr_otp}, 服{curr_service}")
         
-        # ⚠️ 這裡需要填入你的 OpenAI API Key 
-        api_key = "請將這裡替換成你的_sk-xxxx_開頭的API_Key"
+        # 🔒 軍規級資安：安全地從 Streamlit 雲端保險箱讀取金鑰，程式碼不留明碼！
+        try:
+            api_key = st.secrets["OPENAI_API_KEY"]
+        except Exception:
+            st.error("⚠️ 系統找不到 API Key！請確定您已經將密碼設定在 Streamlit 的 Secrets 中。")
+            api_key = ""
         
         uq = st.chat_input("請輸入戰略問題 (例：請用瑞士起司模型分析目前的機隊維修風險，並給予預算分配建議)...")
         
-        if uq:
+        if uq and api_key:
             st.chat_message("user").write(uq)
             
             with st.chat_message("assistant"):
@@ -504,7 +508,6 @@ elif st.session_state.get("authentication_status"):
                         from openai import OpenAI
                         client = OpenAI(api_key=api_key)
                         
-                        # 已經將全形引號替換為安全的半形引號與括號
                         system_prompt = f"""
                         你是一位擁有20年經驗的"航空公司營運與飛航安全戰略幕僚"。
                         你的說話風格專業、自然、具備同理心，就像一位真實存在的高階顧問。
@@ -533,8 +536,7 @@ elif st.session_state.get("authentication_status"):
                         st.write(ai_reply)
                         
                     except Exception as e:
-                        st.error("⚠️ 啟動 AI 幕僚失敗。請確認是否已填入正確的 API Key，或檢查網路連線。")
+                        st.error("⚠️ 啟動 AI 幕僚失敗。請確認網路連線或 API 額度狀況。")
                         st.caption(f"錯誤代碼: {e}")
-                    except Exception as e:
                         st.error("⚠️ 啟動 AI 幕僚失敗。請確認是否已填入正確的 API Key，或檢查網路連線。")
                         st.caption(f"錯誤代碼: {e}")
