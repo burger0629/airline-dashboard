@@ -512,7 +512,7 @@ elif st.session_state.get("authentication_status"):
 
     with tab5:
         st.subheader("🤖 AI 戰略幕僚 (Virtual Advisor)")
-        st.info(f"🧠 **系統 Context 已同步**：總預算 {total_budget}M, 最大工時 {max_labor_hours}H。分數：安{curr_safety}, 修{curr_maint}, 調{curr_otp}, 服{curr_service}")
+        st.info(f"🧠 **系統 Context 已同步**：內外部數據 (營運體質、航線氣象、即時軍事警戒) 皆已連線。")
         
         try:
             api_key = st.secrets.get("OPENAI_API_KEY", "")
@@ -520,7 +520,7 @@ elif st.session_state.get("authentication_status"):
             api_key = ""
             st.error("⚠️ 系統找不到 API Key！請確定您已經將密碼設定在 Streamlit 的 Secrets 中。")
         
-        uq = st.chat_input("請輸入戰略問題 (例：請用瑞士起司模型分析目前的機隊維修風險，並給予預算分配建議)...")
+        uq = st.chat_input("請輸入戰略問題 (例：請綜合評估目前這條航線的地緣政治風險，並給予簽派建議)...")
         
         if uq:
             st.chat_message("user").write(uq)
@@ -529,24 +529,38 @@ elif st.session_state.get("authentication_status"):
                 if not api_key:
                     st.error("⚠️ 缺少 OpenAI API Key，無法啟動 AI 幕僚。")
                 else:
-                    with st.spinner("AI 幕僚正在調閱飛安數據與風險模型..."):
+                    with st.spinner("AI 幕僚正在交叉比對「內部營運數據」與「全球即時威脅雷達」..."):
                         try:
                             from openai import OpenAI
                             client = OpenAI(api_key=api_key)
                             
+                            # 【安全擷取 Tab 4 的即時外部數據】避免網路錯誤時當機
+                            route_str = f"{locals().get('origin_input', '未知')} 飛往 {locals().get('dest_input', '未知')}"
+                            weather_str = f"起飛區({locals().get('o_cond', '未知')}, {locals().get('o_wind', '未知')}kt) -> 航路中繼({locals().get('mid_cond', '未知')}, {locals().get('mid_wind', '未知')}kt) -> 降落區({locals().get('d_cond', '未知')}, {locals().get('d_wind', '未知')}kt)"
+                            
+                            alerts = locals().get('live_alerts', [])
+                            alert_str = "、".join([a['title'] for a in alerts]) if alerts else "目前全球監測網無重大軍事或飛彈衝突情報。"
+                            
                             system_prompt = f"""
                             你是一位擁有20年經驗的"航空公司營運與飛航安全戰略幕僚"。
-                            你的說話風格專業、自然、具備同理心，就像一位真實存在的高階顧問。
+                            你的說話風格專業、自然、冷靜且具備同理心，就像一位真實存在的高階軍事/航空顧問。
                             
                             [嚴格限制與職責]
-                            1. 領域限制：你的回答必須絕對限制在"航空營運、飛航安全管理系統(SMS)、風險分析(如瑞士起司模型)、機隊維修、航班調度"領域。如果使用者詢問如寫程式、旅遊景點、日常閒聊等無關問題，請禮貌拒絕並引導回航空營運主題。
-                            2. 數據支撐：請務必根據以下"戰情室即時數據"來提供客製化建議，不要只給空泛的理論：
+                            1. 領域限制：你的回答必須絕對限制在"航空營運、安全管理系統(SMS)、風險分析(如瑞士起司模型)、機隊維修、航線威脅評估、地緣政治飛安影響、飛彈危機應對"領域。若問題無關，請禮貌引導回飛安主題。
+                            2. 數據支撐：請務必「融合」以下兩大板塊的即時數據來提供客製化建議：
+                            
+                               【板塊一：內部營運體質】
                                - 當前飛安控管評分：{curr_safety} / 100
                                - 當前機隊維修評分：{curr_maint} / 100
                                - 當前航班調度評分：{curr_otp} / 100
                                - 當前旅客服務評分：{curr_service} / 100
                                - 總經理可動用的總預算：{total_budget} 百萬台幣
                                - 剩餘可用的維修工時：{max_labor_hours} 小時
+                               
+                               【板塊二：外部動態航線威脅 (LIVE)】
+                               - 當前監控航線：{route_str}
+                               - 即時氣象威脅：{weather_str}
+                               - 全球地緣軍事警戒：{alert_str}
                             """
                             
                             response = client.chat.completions.create(
@@ -563,4 +577,5 @@ elif st.session_state.get("authentication_status"):
                             
                         except Exception as e:
                             st.error("⚠️ 啟動 AI 幕僚失敗。請確認網路連線或 API 額度狀況。")
+                            st.caption(f"錯誤代碼: {e}")
                             st.caption(f"錯誤代碼: {e}")
