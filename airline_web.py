@@ -8,26 +8,25 @@ import datetime
 import requests
 import time
 from geopy.geocoders import Nominatim
+import feedparser  # [新增] 用來抓取 RSS 即時軍事情報
 
-# [新增] 引入我們剛建立的權限模組
+# 引入我們剛建立的權限模組
 from auth_system import setup_authenticator 
 
-# 設定網頁版面 (寬版) - 必須在所有指令最前面
+# ==========================================
+# 0. 網頁基本設定 (必須在第一行)
+# ==========================================
 st.set_page_config(page_title="航空公司營運戰情室 (God Mode)", layout="wide", initial_sidebar_state="expanded")
 
 # ==========================================
-# [新增] 系統登入大門
-# ==========================================
-# ==========================================
-# 1. 系統登入大門
+# 1. 系統登入大門 (使用 Session State 避免回傳報錯)
 # ==========================================
 authenticator, config = setup_authenticator()
 st.subheader("🛡️ 航空戰情室 - 企業級安全登入")
 
-# 【修改 1】單純呼叫 login 產生登入框，不使用變數去接它的回傳值
+# 產生登入畫面，不使用變數去接，改由 session_state 判斷
 authenticator.login(location="main")
 
-# 【修改 2】全面改用 st.session_state 來判斷系統狀態
 if st.session_state.get("authentication_status") is False:
     st.error("❌ 識別碼或通行密碼錯誤，拒絕存取。")
 elif st.session_state.get("authentication_status") is None:
@@ -35,56 +34,52 @@ elif st.session_state.get("authentication_status") is None:
     st.info("💡 測試帳號：`commander_lin` / 密碼：`123456`")
 elif st.session_state.get("authentication_status"):
     
-    # 【修改 3】登入成功後，直接從 session_state 提取使用者資訊
+    # ==========================================
+    # 2. 登入成功後的核心戰情室程式碼
+    # ==========================================
     name = st.session_state["name"]
     username = st.session_state["username"]
     
     # 取得身分權限
     user_role = config["credentials"]["usernames"][username]["role"]
 
-    # 在側邊欄頂端加入登出按鈕與身分標示
+    # 在側邊欄頂端加入登出按鈕與身分標示 (加入 unique key 避免重複元件報錯)
     with st.sidebar:
         st.success(f"登入身分：{name} ({user_role})")
-        authenticator.logout("安全登出系統", "sidebar")
+        authenticator.logout("安全登出系統", "sidebar", key="unique_logout_btn_123")
         st.markdown("---")
 
-    # ==========================================
-    # 這裡往下，就是繼續接你原本寫的 st.title("✈️ 航空公司營運戰情室...") 等完整程式碼
-    # ==========================================
-    # 在側邊欄頂端加入登出按鈕與身分標示
-    with st.sidebar:
-        st.success(f"登入身分：{name} ({user_role})")
-        authenticator.logout("安全登出系統", "sidebar", key="unique_logout_button_123")
-        st.markdown("---")
-
-    # ==========================================
-    # 以下為你 100% 原封不動的原始程式碼 (僅向右縮排)
-    # ==========================================
     st.title("✈️ 航空公司營運戰情室 (Aviation War Room - 企業頂規版)")
-    st.markdown("整合 **六級風險診斷**、**多維限制最佳化**、**財務衝擊預測**、**動態航線風險** 與 **AI 戰略幕僚** 的決策支援系統。")
+    st.markdown("整合 **六級風險診斷**、**多維限制最佳化**、**財務衝擊預測**、**動態航線風險 (Live)** 與 **AI 戰略幕僚** 的決策支援系統。")
 
     # ==========================================
     # 網頁側邊欄 (數據輸入與多維度限制)
     # ==========================================
     st.sidebar.header("📅 營運指標數據輸入")
 
-    st.sidebar.subheader("【本年度 (Current Year)】")
-    curr_safety = st.sidebar.slider("1. 飛安控管 (今年)", 0.0, 100.0, 75.0, step=1.0)
-    curr_maint = st.sidebar.slider("2. 機隊維修 (今年)", 0.0, 100.0, 45.0, step=1.0)
-    curr_otp = st.sidebar.slider("3. 航班調度 (今年)", 0.0, 100.0, 85.0, step=1.0)
-    curr_service = st.sidebar.slider("4. 旅客服務 (今年)", 0.0, 100.0, 90.0, step=1.0)
+    if user_role == "Commander":
+        st.sidebar.subheader("【本年度 (Current Year)】")
+        curr_safety = st.sidebar.slider("1. 飛安控管 (今年)", 0.0, 100.0, 75.0, step=1.0)
+        curr_maint = st.sidebar.slider("2. 機隊維修 (今年)", 0.0, 100.0, 45.0, step=1.0)
+        curr_otp = st.sidebar.slider("3. 航班調度 (今年)", 0.0, 100.0, 85.0, step=1.0)
+        curr_service = st.sidebar.slider("4. 旅客服務 (今年)", 0.0, 100.0, 90.0, step=1.0)
 
-    st.sidebar.divider()
-    st.sidebar.subheader("【前年度 (Last Year)】")
-    prev_safety = st.sidebar.slider("1. 飛安控管 (去年)", 0.0, 100.0, 85.0, step=1.0)
-    prev_maint = st.sidebar.slider("2. 機隊維修 (去年)", 0.0, 100.0, 60.0, step=1.0)
-    prev_otp = st.sidebar.slider("3. 航班調度 (去年)", 0.0, 100.0, 80.0, step=1.0)
-    prev_service = st.sidebar.slider("4. 旅客服務 (去年)", 0.0, 100.0, 95.0, step=1.0)
+        st.sidebar.divider()
+        st.sidebar.subheader("【前年度 (Last Year)】")
+        prev_safety = st.sidebar.slider("1. 飛安控管 (去年)", 0.0, 100.0, 85.0, step=1.0)
+        prev_maint = st.sidebar.slider("2. 機隊維修 (去年)", 0.0, 100.0, 60.0, step=1.0)
+        prev_otp = st.sidebar.slider("3. 航班調度 (去年)", 0.0, 100.0, 80.0, step=1.0)
+        prev_service = st.sidebar.slider("4. 旅客服務 (去年)", 0.0, 100.0, 95.0, step=1.0)
 
-    st.sidebar.divider()
-    st.sidebar.subheader("🚧 系統資源限制 (Constraints)")
-    total_budget = st.sidebar.number_input("💰 可用總預算 (百萬台幣)", min_value=10.0, value=500.0, step=10.0)
-    max_labor_hours = st.sidebar.number_input("👷 最大可用維修工時 (小時)", min_value=1000, value=15000, step=500)
+        st.sidebar.divider()
+        st.sidebar.subheader("🚧 系統資源限制 (Constraints)")
+        total_budget = st.sidebar.number_input("💰 可用總預算 (百萬台幣)", min_value=10.0, value=500.0, step=10.0)
+        max_labor_hours = st.sidebar.number_input("👷 最大可用維修工時 (小時)", min_value=1000, value=15000, step=500)
+    else:
+        st.sidebar.info("權限限制：您目前為「分析官」，僅具備檢視權限，無權進行最佳化資源重分配。")
+        curr_safety, curr_maint, curr_otp, curr_service = 75.0, 45.0, 85.0, 90.0
+        prev_safety, prev_maint, prev_otp, prev_service = 85.0, 60.0, 80.0, 95.0
+        total_budget, max_labor_hours = 500.0, 15000
 
     categories = ['飛安控管', '機隊維修', '航班調度', '旅客服務']
     weights = np.array([0.40, 0.30, 0.20, 0.10])
@@ -111,7 +106,7 @@ elif st.session_state.get("authentication_status"):
     alloc_dict = {cat: alloc for cat, alloc in zip(categories, allocations)}
 
     # ==========================================
-    # UI 元件與完整六級知識庫 (不縮水版)
+    # UI 元件與完整六級知識庫
     # ==========================================
     def get_risk_level_config(score):
         if score == 100.0: return ('perfect', "#00d26a", "🏆 卓越典範 (PERFECT) —— 系統處於理想狀態，維持卓越並分享經驗")
@@ -129,7 +124,6 @@ elif st.session_state.get("authentication_status"):
         elif delta < 0: trend_label = f"↘️ 微幅下滑 ({delta:.1f})"
         else: trend_label = "➖ 表現持平"
 
-        bg_color = main_color + "20" 
         st.markdown(f"""
         <div style="background-color: transparent; padding:20px; border-radius:10px; border: 1px solid {main_color}50; border-left: 8px solid {main_color}; margin-top: 20px; margin-bottom: 15px;">
             <h3 style="color: var(--text-color); margin-top:0;">
@@ -177,31 +171,59 @@ elif st.session_state.get("authentication_status"):
     }
 
     # ==========================================
-    # 報表匯出功能 (完整字詞與建議)
+    # API 函數定義 (氣象與軍事情報)
     # ==========================================
-    report_content = f"""# 航空公司年度營運診斷與資源最佳化報告
-    **報告生成時間：** {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-    **總可用預算：** {total_budget} 百萬台幣 | **可用工時：** {max_labor_hours} 小時
+    @st.cache_data(show_spinner=False)
+    def get_lat_lon(location_name):
+        try:
+            geolocator = Nominatim(user_agent="airline_dashboard_v7")
+            loc = geolocator.geocode(location_name, timeout=10)
+            if loc: return loc.latitude, loc.longitude
+            return None, None
+        except: return None, None
 
-    ## 一、 最佳化預算配置建議\n"""
-    for cat, alloc in alloc_dict.items():
-        report_content += f"- **{cat}**：建議投入 {alloc:.1f} 百萬台幣\n"
+    @st.cache_data(ttl=600, show_spinner=False)
+    def get_live_weather(lat, lon):
+        try:
+            url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,wind_speed_10m,weather_code&wind_speed_unit=kn"
+            res = requests.get(url, timeout=5).json()
+            curr = res.get('current', {})
+            wind_kt = curr.get('wind_speed_10m', "N/A")
+            temp_c = curr.get('temperature_2m', "N/A")
+            
+            code = curr.get('weather_code', 0)
+            if code in [0, 1, 2, 3]: condition = "晴朗/多雲 🌤️"
+            elif code in [45, 48]: condition = "濃霧視障 🌫️"
+            elif code in [51, 53, 55, 61, 63, 65, 80, 81, 82]: condition = "降雨/陣雨 🌧️"
+            elif code in [71, 73, 75, 77, 85, 86]: condition = "降雪 ❄️"
+            elif code in [95, 96, 99]: condition = "雷暴/極端不穩定 ⛈️"
+            else: condition = "未知氣候"
+                
+            return wind_kt, temp_c, condition
+        except:
+            return "N/A", "N/A", "連線失敗"
 
-    report_content += "\n## 二、 深度專家診斷與改善行動方案\n"
-    for i, cat in enumerate(categories):
-        level, _, status_text = get_risk_level_config(curr_scores[i])
-        data = knowledge_base[cat][level]
-        report_content += f"\n### 【{cat}】 狀態判定：{status_text}\n"
-        if level in ['catastrophic', 'high_risk', 'serious', 'caution']:
-            report_content += "**🔍 潛在根本原因：**\n"
-            for reason in data['reasons']:
-                report_content += f"- {reason}\n"
-        report_content += "**🛠️ 具體執行方案：**\n"
-        for action in data['actions']:
-            report_content += f"- {action}\n"
-
-    st.sidebar.divider()
-    st.sidebar.download_button(label="📄 匯出完整營運診斷書 (Report)", data=report_content, file_name="Airline_Operations_Report.md", mime="text/markdown")
+    @st.cache_data(ttl=600, show_spinner=False)
+    def get_global_conflict_alerts():
+        try:
+            url = "https://feeds.bbci.co.uk/news/world/rss.xml"
+            feed = feedparser.parse(url)
+            keywords = ['war', 'missile', 'strike', 'military', 'attack', 'defense', 'intercept', 'conflict', 'army', 'troops']
+            alerts = []
+            for entry in feed.entries:
+                title_lower = entry.title.lower()
+                if any(k in title_lower for k in keywords):
+                    pub_date = entry.published.split('+')[0].replace('GMT', '').strip()
+                    alerts.append({
+                        "title": entry.title,
+                        "date": pub_date,
+                        "link": entry.link
+                    })
+                if len(alerts) >= 3: 
+                    break
+            return alerts
+        except:
+            return []
 
     # ==========================================
     # 建立五大頁籤架構
@@ -256,7 +278,6 @@ elif st.session_state.get("authentication_status"):
             df_trend = pd.read_csv(uploaded_file)
             st.success("檔案讀取成功！")
         else:
-            # 恢復 YTD 標示
             years = ['2022', '2023', '2024', '2025', '2026(YTD)']
             df_trend = pd.DataFrame({'年份': years, '飛安控管': [92, 88, 85, prev_safety, curr_safety], '機隊維修': [80, 75, 65, prev_maint, curr_maint], '航班調度': [88, 85, 82, prev_otp, curr_otp], '旅客服務': [85, 90, 92, prev_service, curr_service]})
         
@@ -265,7 +286,6 @@ elif st.session_state.get("authentication_status"):
         fig_line.update_layout(yaxis=dict(range=[0, 100]))
         st.plotly_chart(fig_line, use_container_width=True)
         
-        # 恢復展開表格
         with st.expander("📄 查看詳細數據表格"):
             st.dataframe(df_trend, use_container_width=True)
 
@@ -295,7 +315,6 @@ elif st.session_state.get("authentication_status"):
             
             st.success(f"✅ 模擬完成！可為公司 **減少 {saved_money:.1f} 百萬隱性損失**。")
             
-            # 恢復財務預測雷達圖！
             fig_sim = go.Figure()
             fig_sim.add_trace(go.Scatterpolar(r=[100]*5, theta=categories+[categories[0]], fill=None, name='目標標準', line=dict(color='mediumseagreen', dash='dash')))
             fig_sim.add_trace(go.Scatterpolar(r=list(curr_scores)+[curr_scores[0]], theta=categories+[categories[0]], fill='toself', name='本年度現況', line_color='rgba(150, 150, 150, 0.5)'))
@@ -310,44 +329,10 @@ elif st.session_state.get("authentication_status"):
                 st.metric("🔴 目前預估年度隱性損失", f"{current_loss:.1f} 百萬", "維持現狀的代價", delta_color="inverse")
                 st.metric("🟢 模擬後預估年度隱性損失", f"{predicted_loss:.1f} 百萬", f"投資報酬率 (ROI): {((saved_money/total_sim)*100):.1f}%" if total_sim>0 else "0%", delta_color="normal")
 
-    # ==========================================
-    # API 串接模組：擷取即時天氣與定位
-    # ==========================================
-    @st.cache_data(show_spinner=False)
-    def get_lat_lon(location_name):
-        try:
-            geolocator = Nominatim(user_agent="airline_dashboard_v6")
-            loc = geolocator.geocode(location_name, timeout=10)
-            if loc: return loc.latitude, loc.longitude
-            return None, None
-        except: return None, None
-
-    @st.cache_data(ttl=600, show_spinner=False)
-    def get_live_weather(lat, lon):
-        try:
-            url = f"[https://api.open-meteo.com/v1/forecast?latitude=](https://api.open-meteo.com/v1/forecast?latitude=){lat}&longitude={lon}&current=temperature_2m,wind_speed_10m,weather_code&wind_speed_unit=kn"
-            res = requests.get(url, timeout=5).json()
-            curr = res.get('current', {})
-            wind_kt = curr.get('wind_speed_10m', "N/A")
-            temp_c = curr.get('temperature_2m', "N/A")
-            
-            code = curr.get('weather_code', 0)
-            if code in [0, 1, 2, 3]: condition = "晴朗/多雲 🌤️"
-            elif code in [45, 48]: condition = "濃霧視障 🌫️"
-            elif code in [51, 53, 55, 61, 63, 65, 80, 81, 82]: condition = "降雨/陣雨 🌧️"
-            elif code in [71, 73, 75, 77, 85, 86]: condition = "降雪 ❄️"
-            elif code in [95, 96, 99]: condition = "雷暴/極端不穩定 ⛈️"
-            else: condition = "未知氣候"
-                
-            return wind_kt, temp_c, condition
-        except:
-            return "N/A", "N/A", "連線失敗"
-
     with tab4:
         st.subheader("🌍 全球動態航線風險評估 (Live API 串接版)")
-        st.markdown("系統已成功串接 **Geocoding API (地理定位)**、**Open-Meteo API (即時衛星氣象)** 與 **OpenSky (即時航班追蹤)**。")
+        st.markdown("系統已成功串接 **Geocoding API**, **Open-Meteo**, **OpenSky** 與 **RSS 全球軍事警戒網**。")
         
-        # 恢復 9 大機場完整清單！
         airport_presets = [
             "TPE (台北 桃園機場)", "NRT (東京 成田機場)", "SIN (新加坡 樟宜機場)",
             "FRA (法蘭克福機場)", "LHR (倫敦 希斯洛機場)", "JFK (紐約 甘迺迪機場)",
@@ -388,10 +373,9 @@ elif st.session_state.get("authentication_status"):
                 d_wind, d_temp, d_cond = get_live_weather(d_lat, d_lon)
                 mid_wind, mid_temp, mid_cond = get_live_weather(mid_lat, mid_lon)
 
-                # OpenSky 航班追蹤
                 try:
                     bbox = f"lamin={mid_lat-5}&lomin={mid_lon-5}&lamax={mid_lat+5}&lomax={mid_lon+5}"
-                    air_res = requests.get(f"[https://opensky-network.org/api/states/all](https://opensky-network.org/api/states/all)?{bbox}", timeout=3).json()
+                    air_res = requests.get(f"https://opensky-network.org/api/states/all?{bbox}", timeout=3).json()
                     flights = air_res['states'] if air_res and 'states' in air_res else []
                     f_lats = [f[6] for f in flights[:50] if f[6]]
                     f_lons = [f[5] for f in flights[:50] if f[5]]
@@ -444,7 +428,6 @@ elif st.session_state.get("authentication_status"):
                 st.caption(traffic_status)
                 st.plotly_chart(fig_map, use_container_width=True)
 
-                # 恢復完整的氣象資訊排版！
                 st.markdown("### 🌤️ 即時飛航氣象簡報 (Live METAR/Weather)")
                 w_col1, w_col2, w_col3 = st.columns(3)
                 with w_col1:
@@ -456,16 +439,25 @@ elif st.session_state.get("authentication_status"):
 
                 st.divider()
 
-                # 恢復完整的航線風險警告排版！
                 map_col1, map_col2 = st.columns(2)
                 with map_col1:
-                    st.error(f"### 🚨 航路地緣政治情報 (Simulated)")
-                    st.markdown(f"""
-                    **影響空域：** 座標 ({mid_lat:.2f}, {mid_lon:.2f}) 周邊 500 海浬
-                    - **🚩 飛彈活動 (Missile Threats)：** 該區域近期存在未經公告之軍事演習或長程飛彈試射，極高誤擊風險。
-                    - **📡 GPS 欺騙干擾 (Spoofing)：** 近 48 小時內接獲多起訊號覆寫回報。
-                    """)
-                    st.button("❌ 拒絕此航線 (Deny Route)", type="primary")
+                    st.error(f"### 🚨 全球軍事與地緣政治警戒 (LIVE)")
+                    
+                    live_alerts = get_global_conflict_alerts()
+                    if live_alerts:
+                        st.markdown("**📡 戰情室即時攔截情報：**")
+                        for idx, alert in enumerate(live_alerts):
+                            st.markdown(f"""
+                            <div style='background-color:#2b0000; padding:10px; border-left:4px solid red; margin-bottom:10px; border-radius:5px;'>
+                                <strong style='color:#ff4b4b;'>[威脅情報 {idx+1}]</strong> {alert['title']}<br>
+                                <span style='font-size:0.8em; color:#aaaaaa;'>發布時間: {alert['date']}</span>
+                            </div>
+                            """, unsafe_allow_html=True)
+                    else:
+                        st.success("✅ 當前全球監測網未攔截到重大軍事或飛彈衝突情報。")
+                        
+                    st.markdown("---")    
+                    st.button("❌ 拒絕此航線並發布避讓指令", type="primary")
 
                 with map_col2:
                     st.success("### ✅ 系統建議：啟用動態安全繞道航線")
@@ -490,53 +482,53 @@ elif st.session_state.get("authentication_status"):
         st.subheader("🤖 AI 戰略幕僚 (Virtual Advisor)")
         st.info(f"🧠 **系統 Context 已同步**：總預算 {total_budget}M, 最大工時 {max_labor_hours}H。分數：安{curr_safety}, 修{curr_maint}, 調{curr_otp}, 服{curr_service}")
         
-        # 🔒 軍規級資安：安全地從 Streamlit 雲端保險箱讀取金鑰，程式碼不留明碼！
         try:
-            api_key = st.secrets["OPENAI_API_KEY"]
-        except Exception:
-            st.error("⚠️ 系統找不到 API Key！請確定您已經將密碼設定在 Streamlit 的 Secrets 中。")
+            api_key = st.secrets.get("OPENAI_API_KEY", "")
+        except:
             api_key = ""
+            st.error("⚠️ 系統找不到 API Key！請確定您已經將密碼設定在 Streamlit 的 Secrets 中。")
         
         uq = st.chat_input("請輸入戰略問題 (例：請用瑞士起司模型分析目前的機隊維修風險，並給予預算分配建議)...")
         
-        if uq and api_key:
+        if uq:
             st.chat_message("user").write(uq)
             
             with st.chat_message("assistant"):
-                with st.spinner("AI 幕僚正在調閱飛安數據與風險模型..."):
-                    try:
-                        from openai import OpenAI
-                        client = OpenAI(api_key=api_key)
-                        
-                        system_prompt = f"""
-                        你是一位擁有20年經驗的"航空公司營運與飛航安全戰略幕僚"。
-                        你的說話風格專業、自然、具備同理心，就像一位真實存在的高階顧問。
-                        
-                        [嚴格限制與職責]
-                        1. 領域限制：你的回答必須絕對限制在"航空營運、飛航安全管理系統(SMS)、風險分析(如瑞士起司模型)、機隊維修、航班調度"領域。如果使用者詢問如寫程式、旅遊景點、日常閒聊等無關問題，請禮貌拒絕並引導回航空營運主題。
-                        2. 數據支撐：請務必根據以下"戰情室即時數據"來提供客製化建議，不要只給空泛的理論：
-                           - 當前飛安控管評分：{curr_safety} / 100
-                           - 當前機隊維修評分：{curr_maint} / 100
-                           - 當前航班調度評分：{curr_otp} / 100
-                           - 當前旅客服務評分：{curr_service} / 100
-                           - 總經理可動用的總預算：{total_budget} 百萬台幣
-                           - 剩餘可用的維修工時：{max_labor_hours} 小時
-                        """
-                        
-                        response = client.chat.completions.create(
-                            model="gpt-4o-mini",
-                            messages=[
-                                {"role": "system", "content": system_prompt},
-                                {"role": "user", "content": uq}
-                            ],
-                            temperature=0.7
-                        )
-                        
-                        ai_reply = response.choices[0].message.content
-                        st.write(ai_reply)
-                        
-                    except Exception as e:
-                        st.error("⚠️ 啟動 AI 幕僚失敗。請確認網路連線或 API 額度狀況。")
-                        st.caption(f"錯誤代碼: {e}")
-                        st.error("⚠️ 啟動 AI 幕僚失敗。請確認是否已填入正確的 API Key，或檢查網路連線。")
-                        st.caption(f"錯誤代碼: {e}")
+                if not api_key:
+                    st.error("⚠️ 缺少 OpenAI API Key，無法啟動 AI 幕僚。")
+                else:
+                    with st.spinner("AI 幕僚正在調閱飛安數據與風險模型..."):
+                        try:
+                            from openai import OpenAI
+                            client = OpenAI(api_key=api_key)
+                            
+                            system_prompt = f"""
+                            你是一位擁有20年經驗的"航空公司營運與飛航安全戰略幕僚"。
+                            你的說話風格專業、自然、具備同理心，就像一位真實存在的高階顧問。
+                            
+                            [嚴格限制與職責]
+                            1. 領域限制：你的回答必須絕對限制在"航空營運、飛航安全管理系統(SMS)、風險分析(如瑞士起司模型)、機隊維修、航班調度"領域。如果使用者詢問如寫程式、旅遊景點、日常閒聊等無關問題，請禮貌拒絕並引導回航空營運主題。
+                            2. 數據支撐：請務必根據以下"戰情室即時數據"來提供客製化建議，不要只給空泛的理論：
+                               - 當前飛安控管評分：{curr_safety} / 100
+                               - 當前機隊維修評分：{curr_maint} / 100
+                               - 當前航班調度評分：{curr_otp} / 100
+                               - 當前旅客服務評分：{curr_service} / 100
+                               - 總經理可動用的總預算：{total_budget} 百萬台幣
+                               - 剩餘可用的維修工時：{max_labor_hours} 小時
+                            """
+                            
+                            response = client.chat.completions.create(
+                                model="gpt-4o-mini",
+                                messages=[
+                                    {"role": "system", "content": system_prompt},
+                                    {"role": "user", "content": uq}
+                                ],
+                                temperature=0.7
+                            )
+                            
+                            ai_reply = response.choices[0].message.content
+                            st.write(ai_reply)
+                            
+                        except Exception as e:
+                            st.error("⚠️ 啟動 AI 幕僚失敗。請確認網路連線或 API 額度狀況。")
+                            st.caption(f"錯誤代碼: {e}")
