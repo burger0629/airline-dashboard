@@ -1,10 +1,11 @@
 streamlit
 streamlit-authenticator
+bcrypt
 numpy
 pandas
 plotly
 scipy
 requests
 geopy
+feedparser
 openai
-import feedparser
