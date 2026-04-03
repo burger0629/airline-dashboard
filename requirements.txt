@@ -1,7 +1,8 @@
 streamlit
+streamlit-authenticator
 numpy
-plotly
 pandas
+plotly
 scipy
-geopy
 requests
+geopy
