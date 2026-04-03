@@ -486,7 +486,7 @@ elif st.session_state.get("authentication_status"):
                     
                     st.button("✅ 批准並重新簽派 (Approve & Dispatch)")
 
-   with tab5:
+    with tab5:
         st.subheader("🤖 AI 戰略幕僚 (Virtual Advisor)")
         st.info(f"🧠 **系統 Context 已同步**：總預算 {total_budget}M, 最大工時 {max_labor_hours}H。分數：安{curr_safety}, 修{curr_maint}, 調{curr_otp}, 服{curr_service}")
         
