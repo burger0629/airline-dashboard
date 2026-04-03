@@ -158,7 +158,7 @@ elif st.session_state.get("authentication_status"):
     }
 
     # ==========================================
-    # 🌟 找回的報表匯出功能
+    # 🌟 報表匯出功能
     # ==========================================
     report_content = f"""# 航空公司年度營運診斷與資源最佳化報告
     **報告生成時間：** {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
@@ -190,7 +190,6 @@ elif st.session_state.get("authentication_status"):
     # ==========================================
     @st.cache_data(show_spinner=False)
     def get_lat_lon(location_name):
-        # 🌟 絕對精準的機場座標字典 (保證瞬間秒殺載入，防呆防錯)
         preset_coords = {
             "TPE (台北 桃園機場)": (25.0777, 121.2328),
             "NRT (東京 成田機場)": (35.7647, 140.3863),
@@ -203,13 +202,10 @@ elif st.session_state.get("authentication_status"):
             "SYD (雪梨機場)": (-33.9461, 151.1772)
         }
         
-        # 如果使用者選的是下拉選單的預設機場，直接給出神準座標
         if location_name in preset_coords:
             return preset_coords[location_name]
             
-        # 如果是使用者「自行輸入」的字眼，才交給 API 去大海撈針
         try:
-            # 自動清理括號等干擾字元，提高 API 命中率
             search_query = location_name.split('(')[0].strip() if '(' in location_name else location_name
             geolocator = Nominatim(user_agent="airline_dashboard_v7")
             loc = geolocator.geocode(search_query, timeout=10)
@@ -242,21 +238,20 @@ elif st.session_state.get("authentication_status"):
     @st.cache_data(ttl=600, show_spinner=False)
     def get_global_conflict_alerts():
         try:
-            url = "https://feeds.bbci.co.uk/news/world/rss.xml"
+            # 🌟 升級版：切換為 Google News 繁體中文軍事警戒網
+            url = "https://news.google.com/rss/search?q=飛彈+OR+空襲+OR+軍事衝突+OR+開戰+OR+防空&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
             feed = feedparser.parse(url)
-            keywords = ['war', 'missile', 'strike', 'military', 'attack', 'defense', 'intercept', 'conflict', 'army', 'troops']
+            
             alerts = []
-            for entry in feed.entries:
-                title_lower = entry.title.lower()
-                if any(k in title_lower for k in keywords):
-                    pub_date = entry.published.split('+')[0].replace('GMT', '').strip()
-                    alerts.append({
-                        "title": entry.title,
-                        "date": pub_date,
-                        "link": entry.link
-                    })
-                if len(alerts) >= 3: 
-                    break
+            for entry in feed.entries[:3]: # 直接抓取最新 3 筆重大警戒
+                # 清除標題後綴的新聞來源名稱，保持版面乾淨
+                clean_title = entry.title.rsplit(' - ', 1)[0]
+                pub_date = entry.published if 'published' in entry else ""
+                alerts.append({
+                    "title": clean_title,
+                    "date": pub_date,
+                    "link": entry.link
+                })
             return alerts
         except:
             return []
@@ -483,10 +478,11 @@ elif st.session_state.get("authentication_status"):
                     if live_alerts:
                         st.markdown("**📡 戰情室即時攔截情報：**")
                         for idx, alert in enumerate(live_alerts):
+                            # 🌟 升級版：支援自動明暗模式切換的透明護眼排版，字體保證清晰！
                             st.markdown(f"""
-                            <div style='background-color:#2b0000; padding:10px; border-left:4px solid red; margin-bottom:10px; border-radius:5px;'>
-                                <strong style='color:#ff4b4b;'>[威脅情報 {idx+1}]</strong> {alert['title']}<br>
-                                <span style='font-size:0.8em; color:#aaaaaa;'>發布時間: {alert['date']}</span>
+                            <div style='background-color: rgba(255, 75, 75, 0.1); padding:10px; border-left:4px solid #ff4b4b; margin-bottom:10px; border-radius:5px;'>
+                                <strong style='color:#ff4b4b;'>[威脅情報 {idx+1}]</strong> <span style='color: var(--text-color); font-weight: bold;'>{alert['title']}</span><br>
+                                <span style='font-size:0.8em; color: gray;'>發布時間: {alert['date']}</span>
                             </div>
                             """, unsafe_allow_html=True)
                     else:
