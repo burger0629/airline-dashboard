@@ -19,7 +19,8 @@ st.set_page_config(page_title="航空公司營運戰情室 (God Mode)", layout="
 # [新增] 系統登入大門
 # ==========================================
 authenticator, config = setup_authenticator()
-name, authentication_status, username = authenticator.login("航空戰情室 - 企業級安全登入", "main")
+st.subheader("🛡️ 航空戰情室 - 企業級安全登入") # 把標題獨立拿出來寫
+name, authentication_status, username = authenticator.login(location="main") # 這裡只留 location
 
 if authentication_status == False:
     st.error("❌ 識別碼或通行密碼錯誤，拒絕存取。")
