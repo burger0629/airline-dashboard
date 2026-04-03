@@ -1,22 +1,23 @@
 import streamlit_authenticator as stauth
 
 def setup_authenticator():
-    # 建立兩個測試帳號，密碼皆為 '123456'
-    # 這裡的密碼已經經過 bcrypt 雜湊加密，符合最新版 streamlit-authenticator 的安全要求
-    
+    # 【關鍵修改】讓系統即時將 '123456' 轉換成當前環境絕對支援的雜湊碼！
+    passwords = ['123456', '123456']
+    hashed_passwords = stauth.Hasher(passwords).generate()
+
     config = {
         "credentials": {
             "usernames": {
                 "commander_lin": {
                     "email": "lin@mil.edu.tw",
                     "name": "林指揮官",
-                    "password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjIQ68YlsS", # 123456 的正確雜湊值
+                    "password": hashed_passwords[0], # 使用系統自己生成的加密密碼
                     "role": "Commander"
                 },
                 "analyst_beta": {
                     "email": "analyst@mil.edu.tw",
                     "name": "戰情分析官",
-                    "password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjIQ68YlsS", # 123456 的正確雜湊值
+                    "password": hashed_passwords[1], # 使用系統自己生成的加密密碼
                     "role": "Analyst"
                 }
             }
