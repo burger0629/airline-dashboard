@@ -18,20 +18,39 @@ st.set_page_config(page_title="航空公司營運戰情室 (God Mode)", layout="
 # ==========================================
 # [新增] 系統登入大門
 # ==========================================
+# ==========================================
+# 1. 系統登入大門
+# ==========================================
 authenticator, config = setup_authenticator()
-st.subheader("🛡️ 航空戰情室 - 企業級安全登入") # 把標題獨立拿出來寫
-name, authentication_status, username = authenticator.login(location="main") # 這裡只留 location
+st.subheader("🛡️ 航空戰情室 - 企業級安全登入")
 
-if authentication_status == False:
+# 【修改 1】單純呼叫 login 產生登入框，不使用變數去接它的回傳值
+authenticator.login(location="main")
+
+# 【修改 2】全面改用 st.session_state 來判斷系統狀態
+if st.session_state.get("authentication_status") is False:
     st.error("❌ 識別碼或通行密碼錯誤，拒絕存取。")
-elif authentication_status == None:
+elif st.session_state.get("authentication_status") is None:
     st.warning("⚠️ 系統已鎖定，請輸入高階主管識別碼以進入 God Mode 戰情室。")
     st.info("💡 測試帳號：`commander_lin` / 密碼：`123456`")
-
-elif authentication_status:
+elif st.session_state.get("authentication_status"):
+    
+    # 【修改 3】登入成功後，直接從 session_state 提取使用者資訊
+    name = st.session_state["name"]
+    username = st.session_state["username"]
+    
     # 取得身分權限
     user_role = config["credentials"]["usernames"][username]["role"]
 
+    # 在側邊欄頂端加入登出按鈕與身分標示
+    with st.sidebar:
+        st.success(f"登入身分：{name} ({user_role})")
+        authenticator.logout("安全登出系統", "sidebar")
+        st.markdown("---")
+
+    # ==========================================
+    # 這裡往下，就是繼續接你原本寫的 st.title("✈️ 航空公司營運戰情室...") 等完整程式碼
+    # ==========================================
     # 在側邊欄頂端加入登出按鈕與身分標示
     with st.sidebar:
         st.success(f"登入身分：{name} ({user_role})")
