@@ -305,7 +305,7 @@ elif authentication_status:
     @st.cache_data(ttl=600, show_spinner=False)
     def get_live_weather(lat, lon):
         try:
-            url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,wind_speed_10m,weather_code&wind_speed_unit=kn"
+            url = f"[https://api.open-meteo.com/v1/forecast?latitude=](https://api.open-meteo.com/v1/forecast?latitude=){lat}&longitude={lon}&current=temperature_2m,wind_speed_10m,weather_code&wind_speed_unit=kn"
             res = requests.get(url, timeout=5).json()
             curr = res.get('current', {})
             wind_kt = curr.get('wind_speed_10m', "N/A")
@@ -371,7 +371,7 @@ elif authentication_status:
                 # OpenSky 航班追蹤
                 try:
                     bbox = f"lamin={mid_lat-5}&lomin={mid_lon-5}&lamax={mid_lat+5}&lomax={mid_lon+5}"
-                    air_res = requests.get(f"https://opensky-network.org/api/states/all?{bbox}", timeout=3).json()
+                    air_res = requests.get(f"[https://opensky-network.org/api/states/all](https://opensky-network.org/api/states/all)?{bbox}", timeout=3).json()
                     flights = air_res['states'] if air_res and 'states' in air_res else []
                     f_lats = [f[6] for f in flights[:50] if f[6]]
                     f_lons = [f[5] for f in flights[:50] if f[5]]
@@ -477,4 +477,7 @@ elif authentication_status:
                     time.sleep(1.5)
                     wcat = categories[np.argmin(curr_scores)]
                     wscore = np.min(curr_scores)
-                    resp = f"總經理您好。針對問題「*{uq}*」，分析如下：
+                    resp = f"總經理您好。針對問題「*{uq}*」，分析如下：\n\n1. **最大營運破口**：落在 **{wcat} ({wscore}分)**，潛在隱性損失達 {loss_factors[np.argmin(curr_scores)]*(100-wscore):.0f} 百萬。\n"
+                    resp += f"2. **雙重限制衝突**：受限於 {max_labor_hours}H 的『工時上限』，單純砸錢無法解決維修瓶頸。建議將部分 {total_budget}M 預算轉為『外包量能』。\n"
+                    resp += f"3. **航線風險聯動**：剛才在 Tab 4 雷達中，中東航班正在避讓。若調度 ({curr_otp}分) 無法應對繞道延誤，將侵蝕服務 ({curr_service}分)。\n\n💡 **結論**：建議立即執行 Tab 1 的多維限制最佳化方案。"
+                    st.write(resp)
