@@ -8,23 +8,21 @@ import datetime
 import requests
 import time
 from geopy.geocoders import Nominatim
-import feedparser  # [新增] 用來抓取 RSS 即時軍事情報
+import feedparser  
 
-# 引入我們剛建立的權限模組
 from auth_system import setup_authenticator 
 
 # ==========================================
-# 0. 網頁基本設定 (必須在第一行)
+# 0. 網頁基本設定 
 # ==========================================
 st.set_page_config(page_title="航空公司營運戰情室 (God Mode)", layout="wide", initial_sidebar_state="expanded")
 
 # ==========================================
-# 1. 系統登入大門 (使用 Session State 避免回傳報錯)
+# 1. 系統登入大門 
 # ==========================================
 authenticator, config = setup_authenticator()
 st.subheader("🛡️ 航空戰情室 - 企業級安全登入")
 
-# 產生登入畫面，不使用變數去接，改由 session_state 判斷
 authenticator.login(location="main")
 
 if st.session_state.get("authentication_status") is False:
@@ -40,10 +38,8 @@ elif st.session_state.get("authentication_status"):
     name = st.session_state["name"]
     username = st.session_state["username"]
     
-    # 取得身分權限
     user_role = config["credentials"]["usernames"][username]["role"]
 
-    # 在側邊欄頂端加入登出按鈕與身分標示 (加入 unique key 避免重複元件報錯)
     with st.sidebar:
         st.success(f"登入身分：{name} ({user_role})")
         authenticator.logout("安全登出系統", "sidebar", key="unique_logout_btn_123")
@@ -52,9 +48,6 @@ elif st.session_state.get("authentication_status"):
     st.title("✈️ 航空公司營運戰情室 (Aviation War Room - 企業頂規版)")
     st.markdown("整合 **六級風險診斷**、**多維限制最佳化**、**財務衝擊預測**、**動態航線風險 (Live)** 與 **AI 戰略幕僚** 的決策支援系統。")
 
-    # ==========================================
-    # 網頁側邊欄 (數據輸入與多維度限制)
-    # ==========================================
     st.sidebar.header("📅 營運指標數據輸入")
 
     if user_role == "Commander":
@@ -86,9 +79,6 @@ elif st.session_state.get("authentication_status"):
     curr_scores = np.array([curr_safety, curr_maint, curr_otp, curr_service])
     prev_scores = np.array([prev_safety, prev_maint, prev_otp, prev_service])
 
-    # ==========================================
-    # 核心演算法：多維度限制最佳化 (Multi-Constraint Optimization)
-    # ==========================================
     def objective(x, current_scores, weights):
         k_factors = np.array([1.5, 2.0, 1.2, 1.0])
         new_scores = np.clip(current_scores + k_factors * np.sqrt(x), 0, 100)
@@ -105,9 +95,6 @@ elif st.session_state.get("authentication_status"):
     allocations = result.x if result.success else initial_guess
     alloc_dict = {cat: alloc for cat, alloc in zip(categories, allocations)}
 
-    # ==========================================
-    # UI 元件與完整六級知識庫
-    # ==========================================
     def get_risk_level_config(score):
         if score == 100.0: return ('perfect', "#00d26a", "🏆 卓越典範 (PERFECT) —— 系統處於理想狀態，維持卓越並分享經驗")
         elif score >= 81.0: return ('stable', "#28a745", "✅ 安全穩定 (STABLE) —— 績效優良，持續精益求精與深化文化")
@@ -171,16 +158,65 @@ elif st.session_state.get("authentication_status"):
     }
 
     # ==========================================
+    # 🌟 找回的報表匯出功能
+    # ==========================================
+    report_content = f"""# 航空公司年度營運診斷與資源最佳化報告
+    **報告生成時間：** {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+    **總可用預算：** {total_budget} 百萬台幣 | **可用工時：** {max_labor_hours} 小時
+
+    ## 一、 最佳化預算配置建議\n"""
+    for cat, alloc in alloc_dict.items():
+        report_content += f"- **{cat}**：建議投入 {alloc:.1f} 百萬台幣\n"
+
+    report_content += "\n## 二、 深度專家診斷與改善行動方案\n"
+    for i, cat in enumerate(categories):
+        level, _, status_text = get_risk_level_config(curr_scores[i])
+        data = knowledge_base[cat][level]
+        report_content += f"\n### 【{cat}】 狀態判定：{status_text}\n"
+        if level in ['catastrophic', 'high_risk', 'serious', 'caution']:
+            report_content += "**🔍 潛在根本原因：**\n"
+            for reason in data['reasons']:
+                report_content += f"- {reason}\n"
+        report_content += "**🛠️ 具體執行方案：**\n"
+        for action in data['actions']:
+            report_content += f"- {action}\n"
+
+    st.sidebar.divider()
+    st.sidebar.download_button(label="📄 匯出完整營運診斷書 (Report)", data=report_content, file_name="Airline_Operations_Report.md", mime="text/markdown")
+
+
+    # ==========================================
     # API 函數定義 (氣象與軍事情報)
     # ==========================================
     @st.cache_data(show_spinner=False)
     def get_lat_lon(location_name):
+        # 🌟 絕對精準的機場座標字典 (保證瞬間秒殺載入，防呆防錯)
+        preset_coords = {
+            "TPE (台北 桃園機場)": (25.0777, 121.2328),
+            "NRT (東京 成田機場)": (35.7647, 140.3863),
+            "SIN (新加坡 樟宜機場)": (1.3502, 103.9940),
+            "FRA (法蘭克福機場)": (50.0333, 8.5705),
+            "LHR (倫敦 希斯洛機場)": (51.4700, -0.4543),
+            "JFK (紐約 甘迺迪機場)": (40.6413, -73.7781),
+            "LAX (洛杉磯機場)": (33.9416, -118.4085),
+            "DXB (杜拜機場)": (25.2532, 55.3657),
+            "SYD (雪梨機場)": (-33.9461, 151.1772)
+        }
+        
+        # 如果使用者選的是下拉選單的預設機場，直接給出神準座標
+        if location_name in preset_coords:
+            return preset_coords[location_name]
+            
+        # 如果是使用者「自行輸入」的字眼，才交給 API 去大海撈針
         try:
+            # 自動清理括號等干擾字元，提高 API 命中率
+            search_query = location_name.split('(')[0].strip() if '(' in location_name else location_name
             geolocator = Nominatim(user_agent="airline_dashboard_v7")
-            loc = geolocator.geocode(location_name, timeout=10)
+            loc = geolocator.geocode(search_query, timeout=10)
             if loc: return loc.latitude, loc.longitude
             return None, None
-        except: return None, None
+        except: 
+            return None, None
 
     @st.cache_data(ttl=600, show_spinner=False)
     def get_live_weather(lat, lon):
