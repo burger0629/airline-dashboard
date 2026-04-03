@@ -54,7 +54,7 @@ elif st.session_state.get("authentication_status"):
     # 在側邊欄頂端加入登出按鈕與身分標示
     with st.sidebar:
         st.success(f"登入身分：{name} ({user_role})")
-        authenticator.logout("安全登出系統", "sidebar")
+        authenticator.logout("安全登出系統", "sidebar", key="unique_logout_button_123")
         st.markdown("---")
 
     # ==========================================
