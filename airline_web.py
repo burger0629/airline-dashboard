@@ -506,9 +506,13 @@ elif st.session_state.get("authentication_status"):
                             break
                     if is_route_dangerous: break
 
-                detour_lat = max(min(mid_lat - 20, 89.0), -89.0)
-                detour_lon = mid_lon + 20
-                if detour_lon > 180: detour_lon -= 360
+                # 🛠️ 升級：智能雙中繼點南向繞飛演算法
+                # 往南壓低緯度避開東歐與中東核心，並配合東西向動態調整
+                wp1_lat = min(o_lat, d_lat) - 15  
+                wp1_lon = o_lon + (d_lon - o_lon) * 0.35
+                
+                wp2_lat = min(o_lat, d_lat) - 12  
+                wp2_lon = o_lon + (d_lon - o_lon) * 0.75
 
                 fig_map = go.Figure()
 
@@ -530,9 +534,11 @@ elif st.session_state.get("authentication_status"):
 
                 if is_route_dangerous:
                     fig_map.add_trace(go.Scattergeo(
-                        lat=[o_lat, detour_lat, d_lat], lon=[o_lon, detour_lon, d_lon],
+                        # 使用四個點 (起點, 繞飛點1, 繞飛點2, 終點) 畫出平滑包絡線
+                        lat=[o_lat, wp1_lat, wp2_lat, d_lat], 
+                        lon=[o_lon, wp1_lon, wp2_lon, d_lon],
                         mode='lines+markers', line=dict(width=3, color='mediumseagreen'),
-                        name="備用航線 (安全繞飛)", text=[origin_input[:5], "Safe Waypoint", dest_input[:5]]
+                        name="備用航線 (安全繞飛)", text=[origin_input[:5], "繞飛點A (印度洋/南亞)", "繞飛點B (地中海)", dest_input[:5]]
                     ))
 
                 if len(f_lats) > 0:
