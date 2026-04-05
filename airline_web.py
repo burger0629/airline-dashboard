@@ -30,7 +30,7 @@ except:
 # 1. 系統登入大門 
 # ==========================================
 authenticator, config = setup_authenticator()
-st.subheader("🛡️ 航空戰情室 - 企業級安全登入")
+st.subheader("🛡️ 航空戰情室 ")
 
 authenticator.login(location="main")
 
@@ -54,24 +54,24 @@ elif st.session_state.get("authentication_status"):
         authenticator.logout("安全登出系統", "sidebar", key="unique_logout_btn_123")
         st.markdown("---")
 
-    st.title("✈️ 航空公司營運戰情室 (Aviation War Room - 企業頂規版)")
+    st.title("✈️ 航空公司營運戰情室 ")
     st.markdown("整合 **六級風險診斷**、**多維限制最佳化**、**財務衝擊預測**、**動態航線風險 (Live)** 與 **AI 戰略幕僚** 的決策支援系統。")
 
     st.sidebar.header("📅 營運指標數據輸入")
 
     if user_role == "Commander":
         st.sidebar.subheader("【本年度 (Current Year)】")
-        curr_safety = st.sidebar.slider("1. 飛安控管 (今年)", 0.0, 100.0, 75.0, step=1.0)
-        curr_maint = st.sidebar.slider("2. 機隊維修 (今年)", 0.0, 100.0, 45.0, step=1.0)
-        curr_otp = st.sidebar.slider("3. 航班調度 (今年)", 0.0, 100.0, 85.0, step=1.0)
-        curr_service = st.sidebar.slider("4. 旅客服務 (今年)", 0.0, 100.0, 90.0, step=1.0)
+        curr_safety = st.sidebar.slider("1. 飛安控管 ", 0.0, 100.0, 75.0, step=1.0)
+        curr_maint = st.sidebar.slider("2. 機隊維修 ", 0.0, 100.0, 45.0, step=1.0)
+        curr_otp = st.sidebar.slider("3. 航班調度 ", 0.0, 100.0, 85.0, step=1.0)
+        curr_service = st.sidebar.slider("4. 旅客服務 ", 0.0, 100.0, 90.0, step=1.0)
 
         st.sidebar.divider()
         st.sidebar.subheader("【前年度 (Last Year)】")
-        prev_safety = st.sidebar.slider("1. 飛安控管 (去年)", 0.0, 100.0, 85.0, step=1.0)
-        prev_maint = st.sidebar.slider("2. 機隊維修 (去年)", 0.0, 100.0, 60.0, step=1.0)
-        prev_otp = st.sidebar.slider("3. 航班調度 (去年)", 0.0, 100.0, 80.0, step=1.0)
-        prev_service = st.sidebar.slider("4. 旅客服務 (去年)", 0.0, 100.0, 95.0, step=1.0)
+        prev_safety = st.sidebar.slider("1. 飛安控管 ", 0.0, 100.0, 85.0, step=1.0)
+        prev_maint = st.sidebar.slider("2. 機隊維修 ", 0.0, 100.0, 60.0, step=1.0)
+        prev_otp = st.sidebar.slider("3. 航班調度 ", 0.0, 100.0, 80.0, step=1.0)
+        prev_service = st.sidebar.slider("4. 旅客服務 ", 0.0, 100.0, 95.0, step=1.0)
 
         st.sidebar.divider()
         st.sidebar.subheader("🚧 系統資源限制 (Constraints)")
