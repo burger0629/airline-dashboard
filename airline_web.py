@@ -471,7 +471,18 @@ elif st.session_state.get("authentication_status"):
             elif o_lat == d_lat and o_lon == d_lon:
                 st.warning("⚠️ 起降地點相同。")
             else:
-                mid_lat, mid_lon = (o_lat + d_lat) / 2, (o_lon + d_lon) / 2
+                # 🛠️ 修正1：計算最短經度差 (處理太平洋換日線)
+                diff_lon = d_lon - o_lon
+                if diff_lon > 180:
+                    diff_lon -= 360
+                elif diff_lon < -180:
+                    diff_lon += 360
+                    
+                mid_lat = (o_lat + d_lat) / 2
+                mid_lon = o_lon + diff_lon / 2
+                if mid_lon > 180: mid_lon -= 360
+                elif mid_lon < -180: mid_lon += 360
+
                 o_wind, o_temp, o_cond = get_live_weather(o_lat, o_lon)
                 d_wind, d_temp, d_cond = get_live_weather(d_lat, d_lon)
 
@@ -497,7 +508,12 @@ elif st.session_state.get("authentication_status"):
                 for i in range(21):
                     f = i / 20.0
                     c_lat = o_lat + (d_lat - o_lat) * f
-                    c_lon = o_lon + (d_lon - o_lon) * f
+                    
+                    # 🛠️ 修正2：套用換日線經度差，避免錯誤撞擊紅圈
+                    c_lon = o_lon + diff_lon * f
+                    if c_lon > 180: c_lon -= 360
+                    elif c_lon < -180: c_lon += 360
+                    
                     for zone in actual_conflict_zones:
                         dist = np.sqrt((c_lat - zone["lat"])**2 + (c_lon - zone["lon"])**2)
                         if dist < zone["threat_deg"]:
