@@ -191,7 +191,7 @@ elif st.session_state.get("authentication_status"):
     st.sidebar.download_button(label="📄 匯出完整營運診斷書 (Report)", data=report_content, file_name="Airline_Operations_Report.md", mime="text/markdown")
 
     # ==========================================
-    # API 函數定義 (氣象、座標與【嚴格動態圍籬情報】)
+    # API 函數定義 (氣象、座標與【終極語意防護情報網】)
     # ==========================================
     @st.cache_data(show_spinner=False)
     def get_lat_lon(location_name):
@@ -260,13 +260,12 @@ elif st.session_state.get("authentication_status"):
             regions = [city_o, city_d]
             if mid_country: regions.append(mid_country)
             
-            # 🌟 1. 嚴格化威脅關鍵字 (排除「開戰=羽球體育」、「飛彈=庫存軍售」)
-            threat_keywords = ['空襲', '禁飛', '防空警報', '實彈', '封鎖空域', '戰機攔截', '擊落']
+            threat_keywords = ['空襲', '禁飛', '防空警報', '實彈', '封鎖空域', '戰機攔截', '擊落', '飛彈']
             
             region_str = " OR ".join(regions)
             threat_str = " OR ".join(threat_keywords)
             
-            # 🌟 2. 嚴格限制抓取「最近 7 天內」的新聞，排除 2023 舊聞
+            # 使用 Google News 搜尋 (限制 7 天內新聞)
             query = f"({region_str}) AND ({threat_str}) when:7d"
             safe_query = urllib.parse.quote(query)
             
@@ -277,11 +276,31 @@ elif st.session_state.get("authentication_status"):
             for entry in feed.entries:
                 title_lower = entry.title.lower()
                 
-                # 🌟 3. Python 雙重驗證：強制標題內必須「同時」包含地區與威脅字眼，杜絕模糊抓取
-                has_threat = any(k in title_lower for k in threat_keywords)
-                has_region = any(r.lower() in title_lower for r in regions)
+                # 🛡️ 升級 1：負面表列排除 (過濾演習、歷史回顧、娛樂創作、新聞速寫摘要)
+                exclusions = ['小說', '電影', '遊戲', '劇', '年前', '演習', '演練', '測試', '速寫', '回顧', '歷史', '紀念', '模擬', '庫存']
+                if any(x in title_lower for x in exclusions):
+                    continue
                 
-                if has_threat and has_region:
+                # 🛡️ 升級 2：語意區塊切割 (Semantic Segmentation)
+                # 針對「新聞摘要(Digest)」型標題進行切塊分析 (例如：A事件 | B事件 | C事件)
+                segments = title_lower.replace('｜', '|').replace('；', '|').replace(' - ', '|').split('|')
+                
+                is_real_threat = False
+                for seg in segments:
+                    has_threat_in_seg = any(k in seg for k in threat_keywords)
+                    has_region_in_seg = any(r.lower() in seg for r in regions)
+                    
+                    # 必須確保「地點」和「威脅字眼」出現在【同一個獨立事件區塊中】
+                    if has_threat_in_seg and has_region_in_seg:
+                        is_real_threat = True
+                        break
+                
+                # 若標題沒有分隔符號，則做整句的長度安全檢查 (避免超長標題其實是偷懶沒加符號的摘要)
+                if not is_real_threat and len(segments) == 1:
+                    if any(k in title_lower for k in threat_keywords) and any(r.lower() in title_lower for r in regions) and len(title_lower) < 60:
+                        is_real_threat = True
+
+                if is_real_threat:
                     clean_title = entry.title.rsplit(' - ', 1)[0]
                     pub_date = entry.published if 'published' in entry else ""
                     alerts.append({"title": clean_title, "date": pub_date, "link": entry.link})
@@ -552,7 +571,6 @@ elif st.session_state.get("authentication_status"):
                 with map_col1:
                     st.error(f"### 🚨 航線周邊軍事與地緣政治警戒 (LIVE)")
                     
-                    # 呼叫已經過濾掉「體育開戰」與「歷史舊聞」的嚴格版雷達
                     live_alerts = get_route_conflict_alerts(origin_input, dest_input, mid_country)
                     
                     if live_alerts:
