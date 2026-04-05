@@ -45,7 +45,7 @@ elif st.session_state.get("authentication_status"):
         authenticator.logout("安全登出系統", "sidebar", key="unique_logout_btn_123")
         st.markdown("---")
 
-    st.title("✈️ 航空公司營運戰情室 (Aviation War Room - 企業頂規版)")
+    st.title("✈️ 航空公司營運戰情室 ")
     st.markdown("整合 **六級風險診斷**、**多維限制最佳化**、**財務衝擊預測**、**動態航線風險 (Live)** 與 **AI 戰略幕僚** 的決策支援系統。")
 
     st.sidebar.header("📅 營運指標數據輸入")
