@@ -175,138 +175,7 @@ elif st.session_state.get("authentication_status"):
         }
     }
 
-    # ==========================================
-    # 🚀 升級：自動生成精美 HTML 企業級報告
-    # ==========================================
-    # 預先計算最佳化後的財務 ROI 指標，準備寫入報告
-    rep_k_factors = np.array([1.5, 2.0, 1.2, 1.0])
-    rep_predicted_scores = np.clip(curr_scores + rep_k_factors * np.sqrt(allocations), 0, 100)
-    rep_loss_factors = [2.5, 3.0, 1.8, 0.5]
-    rep_current_loss = np.sum((100 - curr_scores) * rep_loss_factors)
-    rep_predicted_loss = np.sum((100 - rep_predicted_scores) * rep_loss_factors)
-    rep_saved_money = rep_current_loss - rep_predicted_loss
-    rep_roi = (rep_saved_money / np.sum(allocations) * 100) if np.sum(allocations) > 0 else 0
-
-    # 組合動態風險卡片 HTML
-    risk_cards_html = ""
-    for i, cat in enumerate(categories):
-        level, main_color, status_text = get_risk_level_config(curr_scores[i])
-        data = knowledge_base[cat][level]
-        
-        reasons_html = ""
-        if level in ['catastrophic', 'high_risk', 'serious', 'caution']:
-            reasons_html = "<h4>🔍 潛在根本原因：</h4><ul class='action-list'>"
-            for r in data['reasons']:
-                reasons_html += f"<li>🚩 {r}</li>"
-            reasons_html += "</ul>"
-            
-        actions_html = "<h4>🛠️ 具體執行方案：</h4><ul class='action-list'>"
-        for a in data['actions']:
-            actions_html += f"<li>{a}</li>"
-        actions_html += "</ul>"
-        
-        risk_cards_html += f"""
-        <div class="risk-card risk-{level}">
-            <div class="risk-title">
-                <span>{cat} <span style="font-size:0.7em; color:gray;">(本期得分: {curr_scores[i]:.1f})</span></span>
-                <span class="tag tag-{level}">{status_text.split('——')[0].strip()}</span>
-            </div>
-            <p style="color:#555; border-bottom: 1px dashed #ccc; padding-bottom:10px;"><strong>狀態說明：</strong> {status_text.split('——')[1].strip() if '——' in status_text else status_text}</p>
-            {reasons_html}
-            {actions_html}
-        </div>
-        """
-
-    # 組合預算分配表格 HTML
-    table_rows = ""
-    for cat, alloc in alloc_dict.items():
-        table_rows += f"<tr><td><strong>{cat}</strong></td><td>{alloc:,.1f} 百萬台幣</td></tr>"
-
-    # 生成完整 HTML 檔案
-    html_report = f"""
-    <!DOCTYPE html>
-    <html lang="zh-TW">
-    <head>
-        <meta charset="UTF-8">
-        <title>航空公司營運戰略報告</title>
-        <style>
-            body {{ font-family: 'Helvetica Neue', Arial, '微軟正黑體', sans-serif; line-height: 1.6; color: #333; max-width: 900px; margin: 0 auto; padding: 40px; background-color: #f4f7f6; }}
-            .header {{ text-align: center; border-bottom: 4px solid #2c3e50; padding-bottom: 20px; margin-bottom: 30px; background: white; padding-top: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);}}
-            h1 {{ color: #2c3e50; margin-bottom: 5px; letter-spacing: 1px; }}
-            .meta-info {{ color: #7f8c8d; font-size: 1.0em; margin-bottom: 10px; }}
-            .section-title {{ color: #2980b9; border-left: 6px solid #2980b9; padding-left: 15px; margin-top: 40px; margin-bottom: 20px; }}
-            .summary-cards {{ display: flex; justify-content: space-between; gap: 15px; margin-bottom: 30px; }}
-            .card {{ background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); flex: 1; text-align: center; border-top: 4px solid #34495e; }}
-            .card h3 {{ margin: 0; font-size: 1.1em; color: #7f8c8d; }}
-            .card .value {{ font-size: 1.8em; font-weight: bold; color: #2c3e50; margin: 10px 0 0 0; }}
-            .card .highlight {{ color: #27ae60; }}
-            table {{ width: 100%; border-collapse: collapse; background: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; margin-bottom: 30px; }}
-            th, td {{ padding: 15px 20px; text-align: left; border-bottom: 1px solid #eee; }}
-            th {{ background-color: #2c3e50; color: white; font-weight: normal; letter-spacing: 1px; }}
-            tr:hover {{ background-color: #f9f9f9; }}
-            .risk-card {{ background: white; padding: 25px; border-radius: 8px; border-left: 8px solid; box-shadow: 0 4px 6px rgba(0,0,0,0.08); margin-bottom: 25px; }}
-            .risk-perfect {{ border-color: #00d26a; }} .risk-stable {{ border-color: #28a745; }} .risk-caution {{ border-color: #ffc107; }}
-            .risk-serious {{ border-color: #fd7e14; }} .risk-high_risk {{ border-color: #e74c3c; }} .risk-catastrophic {{ border-color: #ff3333; }}
-            .risk-title {{ font-size: 1.4em; font-weight: bold; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; }}
-            .tag {{ padding: 6px 12px; border-radius: 20px; font-size: 0.75em; color: white; text-transform: uppercase; letter-spacing: 1px; }}
-            .tag-perfect {{ background: #00d26a; }} .tag-stable {{ background: #28a745; }} .tag-caution {{ background: #ffc107; color: #333; font-weight:bold; }}
-            .tag-serious {{ background: #fd7e14; }} .tag-high_risk {{ background: #e74c3c; }} .tag-catastrophic {{ background: #ff3333; }}
-            h4 {{ margin-bottom: 5px; color: #34495e; }}
-            .action-list {{ margin-top: 5px; padding-left: 20px; color: #444; }}
-            .action-list li {{ margin-bottom: 8px; }}
-            .footer {{ text-align: center; margin-top: 50px; color: #95a5a6; font-size: 0.9em; padding-top: 20px; border-top: 1px solid #ddd; }}
-            @media print {{ body {{ background-color: white; padding: 0; }} .card, .risk-card, table {{ box-shadow: none; border: 1px solid #ddd; }} }}
-        </style>
-    </head>
-    <body>
-        <div class="header">
-            <h1>✈️ 航空公司營運戰略與資源分配報告</h1>
-            <div class="meta-info">報告生成時間：{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")} | 決策將領：{name}</div>
-        </div>
-
-        <div class="summary-cards">
-            <div class="card">
-                <h3>核定總可用預算</h3>
-                <div class="value">{total_budget:,.1f} M</div>
-            </div>
-            <div class="card">
-                <h3>預計挽回隱性損失</h3>
-                <div class="value highlight">💰 {rep_saved_money:,.1f} M</div>
-            </div>
-            <div class="card">
-                <h3>系統最佳化 ROI</h3>
-                <div class="value highlight">{rep_roi:.1f}%</div>
-            </div>
-        </div>
-
-        <h2 class="section-title">📊 最佳化資源分配決策 (Actionable Allocation)</h2>
-        <table>
-            <thead>
-                <tr><th>營運指標項目</th><th>系統建議分配預算</th></tr>
-            </thead>
-            <tbody>
-                {table_rows}
-            </tbody>
-        </table>
-
-        <h2 class="section-title">🩺 營運部門深度診斷與行動綱領 (Diagnostic Protocol)</h2>
-        {risk_cards_html}
-
-        <div class="footer">
-            <p>※ 本報告由 Aviation War Room 系統自動演算生成，內含核心商業決策資訊，請嚴格遵守公司保密協定 (NDA) 妥善保管。</p>
-        </div>
-    </body>
-    </html>
-    """
-
-    st.sidebar.divider()
-    # 將匯出按鈕的副檔名改為 html
-    st.sidebar.download_button(
-        label="📄 匯出企業級精美報告 (HTML)", 
-        data=html_report, 
-        file_name=f"Airline_Strategic_Report_{datetime.datetime.now().strftime('%Y%m%d')}.html", 
-        mime="text/html"
-    )
+   
     # ==========================================
     # API 函數定義 (氣象、座標與【嚴格動態防護情報網】)
     # ==========================================
@@ -815,3 +684,168 @@ elif st.session_state.get("authentication_status"):
                             st.write(response.choices[0].message.content)
                         except:
                             st.error("⚠️ AI 幕僚連線失敗")
+
+    # ==========================================
+    # 🚀 終極升級：自動生成精美 HTML 企業級報告 (含財務與歷史趨勢)
+    # ==========================================
+    # 預先計算最佳化後的財務 ROI 指標
+    rep_k_factors = np.array([1.5, 2.0, 1.2, 1.0])
+    rep_predicted_scores = np.clip(curr_scores + rep_k_factors * np.sqrt(allocations), 0, 100)
+    rep_loss_factors = [2.5, 3.0, 1.8, 0.5]
+    rep_current_loss = np.sum((100 - curr_scores) * rep_loss_factors)
+    rep_predicted_loss = np.sum((100 - rep_predicted_scores) * rep_loss_factors)
+    rep_saved_money = rep_current_loss - rep_predicted_loss
+    rep_roi = (rep_saved_money / np.sum(allocations) * 100) if np.sum(allocations) > 0 else 0
+
+    # [組合 HTML: 1. 財務報表]
+    fin_table_html = "<table><thead><tr><th>營運指標</th><th>目前分數 (現狀)</th><th>最佳化預期分數</th><th>分數成長</th></tr></thead><tbody>"
+    for i, cat in enumerate(categories):
+        diff = rep_predicted_scores[i] - curr_scores[i]
+        fin_table_html += f"<tr><td><strong>{cat}</strong></td><td>{curr_scores[i]:.1f}</td><td style='color:#27ae60; font-weight:bold;'>{rep_predicted_scores[i]:.1f}</td><td>+{diff:.1f}</td></tr>"
+    fin_table_html += f"""
+        <tr style='background-color:#ecf0f1; border-top: 2px solid #bdc3c7;'>
+            <td><strong>年度隱性損失預估</strong></td>
+            <td style='color:#e74c3c; font-weight:bold;'>{rep_current_loss:,.1f} M</td>
+            <td style='color:#27ae60; font-weight:bold;'>{rep_predicted_loss:,.1f} M</td>
+            <td style='color:#2980b9; font-weight:bold;'>挽回 {rep_saved_money:,.1f} M</td>
+        </tr>
+    </tbody></table>
+    """
+
+    # [組合 HTML: 2. 歷史趨勢表]
+    trend_table_html = "<table><thead><tr>"
+    if 'df_trend' in locals():
+        for col in df_trend.columns:
+            trend_table_html += f"<th>{col}</th>"
+        trend_table_html += "</tr></thead><tbody>"
+        for _, row in df_trend.iterrows():
+            trend_table_html += "<tr>"
+            for val in row:
+                if isinstance(val, (int, float)): trend_table_html += f"<td>{val:.1f}</td>"
+                else: trend_table_html += f"<td>{val}</td>"
+            trend_table_html += "</tr>"
+        trend_table_html += "</tbody></table>"
+    else:
+        trend_table_html = "<p style='color:#7f8c8d;'>無歷史數據可供顯示。</p>"
+
+    # [組合 HTML: 3. 部門診斷與分配]
+    risk_cards_html = ""
+    table_rows = ""
+    for i, cat in enumerate(categories):
+        table_rows += f"<tr><td><strong>{cat}</strong></td><td>{alloc_dict[cat]:,.1f} 百萬台幣</td></tr>"
+        level, main_color, status_text = get_risk_level_config(curr_scores[i])
+        data = knowledge_base[cat][level]
+        
+        reasons_html = ""
+        if level in ['catastrophic', 'high_risk', 'serious', 'caution']:
+            reasons_html = "<h4>🔍 潛在根本原因：</h4><ul class='action-list'>"
+            for r in data['reasons']: reasons_html += f"<li>🚩 {r}</li>"
+            reasons_html += "</ul>"
+        actions_html = "<h4>🛠️ 具體執行方案：</h4><ul class='action-list'>"
+        for a in data['actions']: actions_html += f"<li>{a}</li>"
+        actions_html += "</ul>"
+        
+        risk_cards_html += f"""
+        <div class="risk-card risk-{level}">
+            <div class="risk-title">
+                <span>{cat}</span>
+                <span class="tag tag-{level}">{status_text.split('——')[0].strip()}</span>
+            </div>
+            <p style="color:#555; border-bottom: 1px dashed #ccc; padding-bottom:10px;"><strong>狀態說明：</strong> {status_text.split('——')[1].strip() if '——' in status_text else status_text}</p>
+            {reasons_html}
+            {actions_html}
+        </div>
+        """
+
+    # [最終 HTML 組裝]
+    html_report = f"""
+    <!DOCTYPE html>
+    <html lang="zh-TW">
+    <head>
+        <meta charset="UTF-8">
+        <title>航空公司營運戰略報告</title>
+        <style>
+            body {{ font-family: 'Helvetica Neue', Arial, '微軟正黑體', sans-serif; line-height: 1.6; color: #333; max-width: 900px; margin: 0 auto; padding: 40px; background-color: #f4f7f6; }}
+            .header {{ text-align: center; border-bottom: 4px solid #2c3e50; padding-bottom: 20px; margin-bottom: 30px; background: white; padding-top: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);}}
+            h1 {{ color: #2c3e50; margin-bottom: 5px; letter-spacing: 1px; }}
+            .meta-info {{ color: #7f8c8d; font-size: 1.0em; margin-bottom: 10px; }}
+            .section-title {{ color: #2980b9; border-left: 6px solid #2980b9; padding-left: 15px; margin-top: 40px; margin-bottom: 20px; }}
+            .summary-cards {{ display: flex; justify-content: space-between; gap: 15px; margin-bottom: 30px; }}
+            .card {{ background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); flex: 1; text-align: center; border-top: 4px solid #34495e; }}
+            .card h3 {{ margin: 0; font-size: 1.1em; color: #7f8c8d; }}
+            .card .value {{ font-size: 1.8em; font-weight: bold; color: #2c3e50; margin: 10px 0 0 0; }}
+            .card .highlight {{ color: #27ae60; }}
+            table {{ width: 100%; border-collapse: collapse; background: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; margin-bottom: 30px; }}
+            th, td {{ padding: 15px 20px; text-align: left; border-bottom: 1px solid #eee; }}
+            th {{ background-color: #2c3e50; color: white; font-weight: normal; letter-spacing: 1px; }}
+            tr:hover {{ background-color: #f9f9f9; }}
+            .risk-card {{ background: white; padding: 25px; border-radius: 8px; border-left: 8px solid; box-shadow: 0 4px 6px rgba(0,0,0,0.08); margin-bottom: 25px; }}
+            .risk-perfect {{ border-color: #00d26a; }} .risk-stable {{ border-color: #28a745; }} .risk-caution {{ border-color: #ffc107; }}
+            .risk-serious {{ border-color: #fd7e14; }} .risk-high_risk {{ border-color: #e74c3c; }} .risk-catastrophic {{ border-color: #ff3333; }}
+            .risk-title {{ font-size: 1.4em; font-weight: bold; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; }}
+            .tag {{ padding: 6px 12px; border-radius: 20px; font-size: 0.75em; color: white; text-transform: uppercase; letter-spacing: 1px; }}
+            .tag-perfect {{ background: #00d26a; }} .tag-stable {{ background: #28a745; }} .tag-caution {{ background: #ffc107; color: #333; font-weight:bold; }}
+            .tag-serious {{ background: #fd7e14; }} .tag-high_risk {{ background: #e74c3c; }} .tag-catastrophic {{ background: #ff3333; }}
+            h4 {{ margin-bottom: 5px; color: #34495e; }}
+            .action-list {{ margin-top: 5px; padding-left: 20px; color: #444; }}
+            .action-list li {{ margin-bottom: 8px; }}
+            .footer {{ text-align: center; margin-top: 50px; color: #95a5a6; font-size: 0.9em; padding-top: 20px; border-top: 1px solid #ddd; }}
+            @media print {{ body {{ background-color: white; padding: 0; }} .card, .risk-card, table {{ box-shadow: none; border: 1px solid #ddd; }} }}
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>✈️ 航空公司營運戰略與資源分配報告</h1>
+            <div class="meta-info">報告生成時間：{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")} | 決策將領：{name}</div>
+        </div>
+
+        <div class="summary-cards">
+            <div class="card">
+                <h3>核定總可用預算</h3>
+                <div class="value">{total_budget:,.1f} M</div>
+            </div>
+            <div class="card">
+                <h3>預計挽回隱性損失</h3>
+                <div class="value highlight">💰 {rep_saved_money:,.1f} M</div>
+            </div>
+            <div class="card">
+                <h3>系統最佳化 ROI</h3>
+                <div class="value highlight">{rep_roi:.1f}%</div>
+            </div>
+        </div>
+
+        <h2 class="section-title">💸 財務衝擊與沙盤推演 (Financial Impact)</h2>
+        {fin_table_html}
+
+        <h2 class="section-title">📊 最佳化資源分配決策 (Actionable Allocation)</h2>
+        <table>
+            <thead>
+                <tr><th>營運指標項目</th><th>系統建議分配預算</th></tr>
+            </thead>
+            <tbody>
+                {table_rows}
+            </tbody>
+        </table>
+
+        <h2 class="section-title">📈 五年期營運軌跡追蹤 (Historical Trends)</h2>
+        {trend_table_html}
+
+        <h2 class="section-title">🩺 營運部門深度診斷與行動綱領 (Diagnostic Protocol)</h2>
+        {risk_cards_html}
+
+        <div class="footer">
+            <p>※ 本報告由 Aviation War Room 系統自動演算生成，內含核心商業決策資訊，請嚴格遵守公司保密協定 (NDA) 妥善保管。</p>
+        </div>
+    </body>
+    </html>
+    """
+
+    # 將按鈕放回左側選單
+    with st.sidebar:
+        st.divider()
+        st.download_button(
+            label="📄 匯出企業級精美報告 (HTML)", 
+            data=html_report, 
+            file_name=f"Airline_Strategic_Report_{datetime.datetime.now().strftime('%Y%m%d')}.html", 
+            mime="text/html"
+        )
