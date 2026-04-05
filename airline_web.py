@@ -851,7 +851,7 @@ elif st.session_state.get("authentication_status"):
     with st.sidebar:
         st.divider()
         st.download_button(
-            label="📄 匯出企業級精美報告 (HTML)", 
+            label="📄 匯出專業分析報告 (HTML)", 
             data=html_report, 
             file_name=f"Airline_Strategic_Report_{datetime.datetime.now().strftime('%Y%m%d')}.html", 
             mime="text/html"
