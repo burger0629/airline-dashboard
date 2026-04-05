@@ -18,6 +18,14 @@ from auth_system import setup_authenticator
 st.set_page_config(page_title="航空公司營運戰情室 (God Mode)", layout="wide", initial_sidebar_state="expanded")
 
 # ==========================================
+# 🔒 全局 API Key 讀取 (讓所有 Tab 都能使用 AI)
+# ==========================================
+try:
+    api_key = st.secrets.get("OPENAI_API_KEY", "")
+except:
+    api_key = ""
+
+# ==========================================
 # 1. 系統登入大門 
 # ==========================================
 authenticator, config = setup_authenticator()
@@ -45,7 +53,7 @@ elif st.session_state.get("authentication_status"):
         authenticator.logout("安全登出系統", "sidebar", key="unique_logout_btn_123")
         st.markdown("---")
 
-    st.title("✈️ 航空公司營運戰情室 ")
+    st.title("✈️ 航空公司營運戰情室 (Aviation War Room - 企業頂規版)")
     st.markdown("整合 **六級風險診斷**、**多維限制最佳化**、**財務衝擊預測**、**動態航線風險 (Live)** 與 **AI 戰略幕僚** 的決策支援系統。")
 
     st.sidebar.header("📅 營運指標數據輸入")
@@ -157,9 +165,6 @@ elif st.session_state.get("authentication_status"):
         }
     }
 
-    # ==========================================
-    # 🌟 報表匯出功能
-    # ==========================================
     report_content = f"""# 航空公司年度營運診斷與資源最佳化報告
     **報告生成時間：** {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
     **總可用預算：** {total_budget} 百萬台幣 | **可用工時：** {max_labor_hours} 小時
@@ -184,10 +189,6 @@ elif st.session_state.get("authentication_status"):
     st.sidebar.divider()
     st.sidebar.download_button(label="📄 匯出完整營運診斷書 (Report)", data=report_content, file_name="Airline_Operations_Report.md", mime="text/markdown")
 
-
-    # ==========================================
-    # API 函數定義 (氣象與軍事情報)
-    # ==========================================
     @st.cache_data(show_spinner=False)
     def get_lat_lon(location_name):
         preset_coords = {
@@ -238,13 +239,11 @@ elif st.session_state.get("authentication_status"):
     @st.cache_data(ttl=600, show_spinner=False)
     def get_global_conflict_alerts():
         try:
-            # 🌟 升級版：切換為 Google News 繁體中文軍事警戒網
             url = "https://news.google.com/rss/search?q=飛彈+OR+空襲+OR+軍事衝突+OR+開戰+OR+防空&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
             feed = feedparser.parse(url)
             
             alerts = []
-            for entry in feed.entries[:3]: # 直接抓取最新 3 筆重大警戒
-                # 清除標題後綴的新聞來源名稱，保持版面乾淨
+            for entry in feed.entries[:3]: 
                 clean_title = entry.title.rsplit(' - ', 1)[0]
                 pub_date = entry.published if 'published' in entry else ""
                 alerts.append({
@@ -359,6 +358,51 @@ elif st.session_state.get("authentication_status"):
                 st.write("### 📉 投資報酬率分析")
                 st.metric("🔴 目前預估年度隱性損失", f"{current_loss:.1f} 百萬", "維持現狀的代價", delta_color="inverse")
                 st.metric("🟢 模擬後預估年度隱性損失", f"{predicted_loss:.1f} 百萬", f"投資報酬率 (ROI): {((saved_money/total_sim)*100):.1f}%" if total_sim>0 else "0%", delta_color="normal")
+
+            # ==========================================
+            # 🌟 [新增] AI 財務深度診斷與改善建議模組
+            # ==========================================
+            st.divider()
+            st.markdown("### 🤖 AI 財務深度診斷與改善建議")
+            st.caption("根據您上方的預算分配模擬，由 AI 幕僚生成專業的財務與營運衝擊報告。")
+            
+            if st.button("✨ 生成 AI 財務分析報告", type="primary", key="btn_finance_ai"):
+                if not api_key:
+                    st.error("⚠️ 缺少 OpenAI API Key，無法啟動財務分析。請至 Streamlit Secrets 中設定。")
+                else:
+                    with st.spinner("AI 正在結算財務模型與營運數據，準備高階主管簡報..."):
+                        try:
+                            from openai import OpenAI
+                            client = OpenAI(api_key=api_key)
+                            
+                            finance_prompt = f"""
+                            你是一位擁有 20 年經驗的「航空公司營運與財務戰略幕僚」。
+                            請根據以下戰情室的財務沙盤推演數據，撰寫一份精簡、專業、具備同理心的分析報告。
+                            
+                            [當前營運體質 (滿分100)]
+                            飛安:{curr_scores[0]:.1f}, 維修:{curr_scores[1]:.1f}, 調度:{curr_scores[2]:.1f}, 服務:{curr_scores[3]:.1f}
+                            目前的年度隱性損失預估：{current_loss:.1f} 百萬台幣
+                            
+                            [模擬投資後預期 (總計投入 {total_sim:.1f} 百萬台幣)]
+                            預測飛安:{predicted_scores[0]:.1f}, 預測維修:{predicted_scores[1]:.1f}, 預測調度:{predicted_scores[2]:.1f}, 預測服務:{predicted_scores[3]:.1f}
+                            模擬後的年度隱性損失：{predicted_loss:.1f} 百萬台幣 (成功挽回 {saved_money:.1f} 百萬台幣)
+                            
+                            請依照以下三個標題進行條列式說明 (語氣要像在跟總經理做簡報)：
+                            1. 🔴 為何目前會產生嚴重的隱性虧損？ (請點出分數最低的項目，並說明該項目在真實航空業中造成的具體損失，如 AOG 停飛成本、延誤賠償、品牌損害等)
+                            2. 🟢 模擬投資為何能挽回損失？ (請說明這筆預算投入後，為何能發揮槓桿效應、降低營運風險成本)
+                            3. 🛠️ 具體財務與營運改善建議 (請給出 2~3 點可立即執行的具體行動方案)
+                            """
+                            
+                            response = client.chat.completions.create(
+                                model="gpt-4o-mini",
+                                messages=[{"role": "user", "content": finance_prompt}],
+                                temperature=0.7
+                            )
+                            
+                            st.info(response.choices[0].message.content)
+                            
+                        except Exception as e:
+                            st.error(f"⚠️ 產生財務報告失敗，錯誤代碼: {e}")
 
     with tab4:
         st.subheader("🌍 全球動態航線風險評估 (Live API 串接版)")
@@ -478,7 +522,6 @@ elif st.session_state.get("authentication_status"):
                     if live_alerts:
                         st.markdown("**📡 戰情室即時攔截情報：**")
                         for idx, alert in enumerate(live_alerts):
-                            # 🌟 升級版：支援自動明暗模式切換的透明護眼排版，字體保證清晰！
                             st.markdown(f"""
                             <div style='background-color: rgba(255, 75, 75, 0.1); padding:10px; border-left:4px solid #ff4b4b; margin-bottom:10px; border-radius:5px;'>
                                 <strong style='color:#ff4b4b;'>[威脅情報 {idx+1}]</strong> <span style='color: var(--text-color); font-weight: bold;'>{alert['title']}</span><br>
@@ -514,12 +557,6 @@ elif st.session_state.get("authentication_status"):
         st.subheader("🤖 AI 戰略幕僚 (Virtual Advisor)")
         st.info(f"🧠 **系統 Context 已同步**：內外部數據 (營運體質、航線氣象、即時軍事警戒) 皆已連線。")
         
-        try:
-            api_key = st.secrets.get("OPENAI_API_KEY", "")
-        except:
-            api_key = ""
-            st.error("⚠️ 系統找不到 API Key！請確定您已經將密碼設定在 Streamlit 的 Secrets 中。")
-        
         uq = st.chat_input("請輸入戰略問題 (例：請綜合評估目前這條航線的地緣政治風險，並給予簽派建議)...")
         
         if uq:
@@ -534,7 +571,6 @@ elif st.session_state.get("authentication_status"):
                             from openai import OpenAI
                             client = OpenAI(api_key=api_key)
                             
-                            # 【安全擷取 Tab 4 的即時外部數據】避免網路錯誤時當機
                             route_str = f"{locals().get('origin_input', '未知')} 飛往 {locals().get('dest_input', '未知')}"
                             weather_str = f"起飛區({locals().get('o_cond', '未知')}, {locals().get('o_wind', '未知')}kt) -> 航路中繼({locals().get('mid_cond', '未知')}, {locals().get('mid_wind', '未知')}kt) -> 降落區({locals().get('d_cond', '未知')}, {locals().get('d_wind', '未知')}kt)"
                             
@@ -549,7 +585,7 @@ elif st.session_state.get("authentication_status"):
                             1. 領域限制：你的回答必須絕對限制在"航空營運、安全管理系統(SMS)、風險分析(如瑞士起司模型)、機隊維修、航線威脅評估、地緣政治飛安影響、飛彈危機應對"領域。若問題無關，請禮貌引導回飛安主題。
                             2. 數據支撐：請務必「融合」以下兩大板塊的即時數據來提供客製化建議：
                             
-                               【板塊一：內部營運體質】
+                               [板塊一：內部營運體質]
                                - 當前飛安控管評分：{curr_safety} / 100
                                - 當前機隊維修評分：{curr_maint} / 100
                                - 當前航班調度評分：{curr_otp} / 100
@@ -557,7 +593,7 @@ elif st.session_state.get("authentication_status"):
                                - 總經理可動用的總預算：{total_budget} 百萬台幣
                                - 剩餘可用的維修工時：{max_labor_hours} 小時
                                
-                               【板塊二：外部動態航線威脅 (LIVE)】
+                               [板塊二：外部動態航線威脅 (LIVE)]
                                - 當前監控航線：{route_str}
                                - 即時氣象威脅：{weather_str}
                                - 全球地緣軍事警戒：{alert_str}
@@ -577,5 +613,4 @@ elif st.session_state.get("authentication_status"):
                             
                         except Exception as e:
                             st.error("⚠️ 啟動 AI 幕僚失敗。請確認網路連線或 API 額度狀況。")
-                            st.caption(f"錯誤代碼: {e}")
                             st.caption(f"錯誤代碼: {e}")
