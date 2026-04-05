@@ -360,10 +360,57 @@ elif st.session_state.get("authentication_status"):
         df_melted = df_trend.melt(id_vars=['年份'], var_name='營運指標', value_name='分數')
         fig_line = px.line(df_melted, x='年份', y='分數', color='營運指標', markers=True, title='各項營運指標長期趨勢追蹤')
         fig_line.update_layout(yaxis=dict(range=[0, 100]))
+        
+        # 🛠️ 修復小數點年份問題：強制 X 軸將年份視為「獨立類別」而非連續數字
+        fig_line.update_xaxes(type='category')
+        
         st.plotly_chart(fig_line, use_container_width=True)
         
         with st.expander("📄 查看詳細數據表格"):
             st.dataframe(df_trend, use_container_width=True)
+
+        # ==========================================
+        # 🚀 新增：AI 五年期趨勢成因診斷模組
+        # ==========================================
+        st.divider()
+        st.markdown("### 🤖 AI 歷史營運軌跡與成因診斷")
+        st.caption("結合航空實務經驗，深度挖掘五年數據波動，找出隱藏在趨勢背後的結構性原因。")
+        
+        if st.button("📊 生成五年期趨勢深度分析報告", type="primary", key="btn_trend_ai"):
+            if not api_key:
+                st.error("⚠️ 缺少 OpenAI API Key，無法啟動趨勢分析。請至 Streamlit Secrets 中設定。")
+            else:
+                with st.spinner("AI 幕僚正在比對歷年數據，推演結構性成因..."):
+                    try:
+                        from openai import OpenAI
+                        client = OpenAI(api_key=api_key)
+                        
+                        # 將 DataFrame 資料轉化為純文字表格，以便 AI 閱讀
+                        trend_data_str = df_trend.to_string(index=False)
+                        
+                        trend_prompt = f"""
+                        你是一位擁有 20 年經驗的「航空公司高階戰略分析師」。
+                        請根據以下這家航空公司過去 5 年的營運指標變化數據（滿分 100），進行深度的趨勢診斷。
+
+                        [歷史數據]
+                        {trend_data_str}
+
+                        請撰寫一份專業、具備洞察力且語氣沉穩的分析報告，必須包含以下三個段落：
+                        1. 📈 **整體營運軌跡總結** (精準點出這五年來的核心問題或轉型亮點)
+                        2. 🔍 **各指標變動成因推測** (請結合航空業實務，推測分數上升或下滑背後的潛在原因。例如：機隊維修連年下滑可能是面臨機隊老化、供應鏈斷鏈或工廠人力流失；旅客服務上升可能是數位轉型成功、客艙升級等)
+                        3. 💡 **針對下半年的戰略佈局建議** (結合數據趨勢，給予高階主管具體的預算投入或資源重整方向)
+                        """
+                        response = client.chat.completions.create(
+                            model="gpt-4o-mini",
+                            messages=[{"role": "user", "content": trend_prompt}],
+                            temperature=0.7
+                        )
+                        
+                        # 以視覺化的方式呈現報告
+                        st.success("✅ 分析完成！以下為 AI 戰略幕僚提供的深度診斷：")
+                        st.info(response.choices[0].message.content)
+                    except Exception as e:
+                        st.error(f"⚠️ 產生趨勢報告失敗，錯誤代碼: {e}")
 
     with tab3:
         st.subheader("💸 財務沙盤推演 (ROI Simulator)")
