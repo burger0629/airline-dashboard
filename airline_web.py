@@ -9,6 +9,7 @@ import requests
 import time
 from geopy.geocoders import Nominatim
 import feedparser  
+import urllib.parse # [新增] 用來安全編碼地理搜尋字串
 
 from auth_system import setup_authenticator 
 
@@ -18,7 +19,7 @@ from auth_system import setup_authenticator
 st.set_page_config(page_title="航空公司營運戰情室 (God Mode)", layout="wide", initial_sidebar_state="expanded")
 
 # ==========================================
-# 🔒 全局 API Key 讀取 (讓所有 Tab 都能使用 AI)
+# 🔒 全局 API Key 讀取 
 # ==========================================
 try:
     api_key = st.secrets.get("OPENAI_API_KEY", "")
@@ -189,6 +190,9 @@ elif st.session_state.get("authentication_status"):
     st.sidebar.divider()
     st.sidebar.download_button(label="📄 匯出完整營運診斷書 (Report)", data=report_content, file_name="Airline_Operations_Report.md", mime="text/markdown")
 
+    # ==========================================
+    # API 函數定義 (氣象、座標與【動態圍籬情報】)
+    # ==========================================
     @st.cache_data(show_spinner=False)
     def get_lat_lon(location_name):
         preset_coords = {
@@ -202,10 +206,8 @@ elif st.session_state.get("authentication_status"):
             "DXB (杜拜機場)": (25.2532, 55.3657),
             "SYD (雪梨機場)": (-33.9461, 151.1772)
         }
-        
         if location_name in preset_coords:
             return preset_coords[location_name]
-            
         try:
             search_query = location_name.split('(')[0].strip() if '(' in location_name else location_name
             geolocator = Nominatim(user_agent="airline_dashboard_v7")
@@ -214,6 +216,17 @@ elif st.session_state.get("authentication_status"):
             return None, None
         except: 
             return None, None
+
+    @st.cache_data(show_spinner=False)
+    def get_midpoint_region(lat, lon):
+        # 反查航線中繼點的國家名稱，做為情報搜尋的依據
+        try:
+            geolocator = Nominatim(user_agent="airline_dashboard_v8")
+            loc = geolocator.reverse((lat, lon), language='zh-TW', timeout=5)
+            if loc and 'address' in loc.raw:
+                return loc.raw['address'].get('country', '')
+        except: pass
+        return ""
 
     @st.cache_data(ttl=600, show_spinner=False)
     def get_live_weather(lat, lon):
@@ -231,26 +244,38 @@ elif st.session_state.get("authentication_status"):
             elif code in [71, 73, 75, 77, 85, 86]: condition = "降雪 ❄️"
             elif code in [95, 96, 99]: condition = "雷暴/極端不穩定 ⛈️"
             else: condition = "未知氣候"
-                
             return wind_kt, temp_c, condition
         except:
             return "N/A", "N/A", "連線失敗"
 
     @st.cache_data(ttl=600, show_spinner=False)
-    def get_global_conflict_alerts():
+    def get_route_conflict_alerts(origin_input, dest_input, mid_country):
+        # 🌟 核心升級：精準提取地名，不搜全球，只搜航線經過的區域！
         try:
-            url = "https://news.google.com/rss/search?q=飛彈+OR+空襲+OR+軍事衝突+OR+開戰+OR+防空&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
+            def extract_city(loc_str):
+                if '(' in loc_str: return loc_str.split('(')[1].split()[0]
+                return loc_str.split(',')[0].strip()
+                
+            city_o = extract_city(origin_input)
+            city_d = extract_city(dest_input)
+            
+            # 將起點、終點、中繼點組合成動態地理條件
+            regions = [city_o, city_d]
+            if mid_country: regions.append(mid_country)
+            region_str = " OR ".join(regions)
+            
+            # Google RSS 查詢語法：(台北 OR 東京 OR 日本) AND (飛彈 OR 空襲...)
+            query = f"({region_str}) AND (飛彈 OR 空襲 OR 軍事衝突 OR 開戰 OR 防空)"
+            safe_query = urllib.parse.quote(query)
+            
+            url = f"https://news.google.com/rss/search?q={safe_query}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
             feed = feedparser.parse(url)
             
             alerts = []
             for entry in feed.entries[:3]: 
                 clean_title = entry.title.rsplit(' - ', 1)[0]
                 pub_date = entry.published if 'published' in entry else ""
-                alerts.append({
-                    "title": clean_title,
-                    "date": pub_date,
-                    "link": entry.link
-                })
+                alerts.append({"title": clean_title, "date": pub_date, "link": entry.link})
             return alerts
         except:
             return []
@@ -359,9 +384,6 @@ elif st.session_state.get("authentication_status"):
                 st.metric("🔴 目前預估年度隱性損失", f"{current_loss:.1f} 百萬", "維持現狀的代價", delta_color="inverse")
                 st.metric("🟢 模擬後預估年度隱性損失", f"{predicted_loss:.1f} 百萬", f"投資報酬率 (ROI): {((saved_money/total_sim)*100):.1f}%" if total_sim>0 else "0%", delta_color="normal")
 
-            # ==========================================
-            # 🌟 [新增] AI 財務深度診斷與改善建議模組
-            # ==========================================
             st.divider()
             st.markdown("### 🤖 AI 財務深度診斷與改善建議")
             st.caption("根據您上方的預算分配模擬，由 AI 幕僚生成專業的財務與營運衝擊報告。")
@@ -398,15 +420,13 @@ elif st.session_state.get("authentication_status"):
                                 messages=[{"role": "user", "content": finance_prompt}],
                                 temperature=0.7
                             )
-                            
                             st.info(response.choices[0].message.content)
-                            
                         except Exception as e:
                             st.error(f"⚠️ 產生財務報告失敗，錯誤代碼: {e}")
 
     with tab4:
-        st.subheader("🌍 全球動態航線風險評估 (Live API 串接版)")
-        st.markdown("系統已成功串接 **Geocoding API**, **Open-Meteo**, **OpenSky** 與 **RSS 全球軍事警戒網**。")
+        st.subheader("🌍 動態航線風險評估 (Geofencing Live 版)")
+        st.markdown("系統已成功串接 **Geocoding API**, **Open-Meteo**, **OpenSky** 與 **航線地理圍籬 RSS 軍事警戒網**。")
         
         airport_presets = [
             "TPE (台北 桃園機場)", "NRT (東京 成田機場)", "SIN (新加坡 樟宜機場)",
@@ -423,7 +443,7 @@ elif st.session_state.get("authentication_status"):
                 origin_input = origin_sel
 
         with route_col2:
-            dest_sel = st.selectbox("🛬 選擇降落機場 (Destination)", airport_presets, index=3)
+            dest_sel = st.selectbox("🛬 選擇降落機場 (Destination)", airport_presets, index=1) # 預設改為 NRT 方便測試
             if dest_sel == "🌍 自行輸入其他地點...":
                 dest_input = st.text_input("請輸入降落地點 (中英文皆可)：", placeholder="例如: 羅馬, 首爾 ICN...")
             else:
@@ -443,6 +463,9 @@ elif st.session_state.get("authentication_status"):
             else:
                 mid_lat = (o_lat + d_lat) / 2
                 mid_lon = (o_lon + d_lon) / 2
+                
+                # 取得中繼點的國家名稱，作為精準過濾情報的依據
+                mid_country = get_midpoint_region(mid_lat, mid_lon)
                 
                 o_wind, o_temp, o_cond = get_live_weather(o_lat, o_lon)
                 d_wind, d_temp, d_cond = get_live_weather(d_lat, d_lon)
@@ -508,7 +531,7 @@ elif st.session_state.get("authentication_status"):
                 with w_col1:
                     st.info(f"**🛫 起飛地：{origin_input[:10]}**\n\n- 氣候狀態：{o_cond}\n- 實時氣溫：{o_temp} °C\n- 地表風速：{o_wind} 節 (kt)")
                 with w_col2:
-                    st.warning(f"**⚠️ 航路中繼：危險管制區**\n\n- 氣候狀態：{mid_cond}\n- 實時氣溫：{mid_temp} °C\n- 航路風速：{mid_wind} 節 (kt)")
+                    st.warning(f"**⚠️ 航路中繼 ({mid_country or '公海'})**\n\n- 氣候狀態：{mid_cond}\n- 實時氣溫：{mid_temp} °C\n- 航路風速：{mid_wind} 節 (kt)")
                 with w_col3:
                     st.success(f"**🛬 降落地：{dest_input[:10]}**\n\n- 氣候狀態：{d_cond}\n- 實時氣溫：{d_temp} °C\n- 地表風速：{d_wind} 節 (kt)")
 
@@ -516,11 +539,13 @@ elif st.session_state.get("authentication_status"):
 
                 map_col1, map_col2 = st.columns(2)
                 with map_col1:
-                    st.error(f"### 🚨 全球軍事與地緣政治警戒 (LIVE)")
+                    st.error(f"### 🚨 航線周邊軍事與地緣政治警戒 (LIVE)")
                     
-                    live_alerts = get_global_conflict_alerts()
+                    # 呼叫升級版的地理圍籬情報雷達
+                    live_alerts = get_route_conflict_alerts(origin_input, dest_input, mid_country)
+                    
                     if live_alerts:
-                        st.markdown("**📡 戰情室即時攔截情報：**")
+                        st.markdown("**📡 航線警戒雷達攔截情報：**")
                         for idx, alert in enumerate(live_alerts):
                             st.markdown(f"""
                             <div style='background-color: rgba(255, 75, 75, 0.1); padding:10px; border-left:4px solid #ff4b4b; margin-bottom:10px; border-radius:5px;'>
@@ -529,7 +554,7 @@ elif st.session_state.get("authentication_status"):
                             </div>
                             """, unsafe_allow_html=True)
                     else:
-                        st.success("✅ 當前全球監測網未攔截到重大軍事或飛彈衝突情報。")
+                        st.success("✅ 目前系統掃描起降區域與中繼航路，未發現飛彈或重大軍事衝突之警戒。航線評估為安全。")
                         
                     st.markdown("---")    
                     st.button("❌ 拒絕此航線並發布避讓指令", type="primary")
@@ -575,7 +600,7 @@ elif st.session_state.get("authentication_status"):
                             weather_str = f"起飛區({locals().get('o_cond', '未知')}, {locals().get('o_wind', '未知')}kt) -> 航路中繼({locals().get('mid_cond', '未知')}, {locals().get('mid_wind', '未知')}kt) -> 降落區({locals().get('d_cond', '未知')}, {locals().get('d_wind', '未知')}kt)"
                             
                             alerts = locals().get('live_alerts', [])
-                            alert_str = "、".join([a['title'] for a in alerts]) if alerts else "目前全球監測網無重大軍事或飛彈衝突情報。"
+                            alert_str = "、".join([a['title'] for a in alerts]) if alerts else "目前航線周邊無重大軍事衝突情報。"
                             
                             system_prompt = f"""
                             你是一位擁有20年經驗的"航空公司營運與飛航安全戰略幕僚"。
@@ -596,7 +621,7 @@ elif st.session_state.get("authentication_status"):
                                [板塊二：外部動態航線威脅 (LIVE)]
                                - 當前監控航線：{route_str}
                                - 即時氣象威脅：{weather_str}
-                               - 全球地緣軍事警戒：{alert_str}
+                               - 航線地緣軍事警戒：{alert_str}
                             """
                             
                             response = client.chat.completions.create(
