@@ -247,7 +247,7 @@ elif st.session_state.get("authentication_status"):
         except:
             return "N/A", "N/A", "連線失敗"
 
-    # 🛡️ 真實回歸的 NLP 防禦雷達網
+    # 🛡️ 真實回歸的 NLP 防禦雷達網 (排除政策備戰新聞)
     @st.cache_data(ttl=600, show_spinner=False)
     def get_route_conflict_alerts(origin_input, dest_input, mid_country):
         try:
@@ -275,12 +275,12 @@ elif st.session_state.get("authentication_status"):
             for entry in feed.entries:
                 title_lower = entry.title.lower()
                 
-                # 負面表列過濾器
-                exclusions = ['小說', '電影', '遊戲', '劇', '年前', '演習', '演練', '測試', '速寫', '回顧', '歷史', '紀念', '模擬', '庫存']
+                # 🚫 終極擴充負面表列：精準排除「部署、政策、配備」等軍事常態新聞
+                exclusions = ['部署', '配備', '政策', '反擊', '研發', '採購', '試射', '軍售', '合約', '升級', '庫存',
+                              '小說', '電影', '遊戲', '劇', '年前', '演習', '演練', '測試', '速寫', '回顧', '歷史', '紀念', '模擬']
                 if any(x in title_lower for x in exclusions):
                     continue
                 
-                # 語意區塊切割器
                 segments = title_lower.replace('｜', '|').replace('；', '|').replace(' - ', '|').split('|')
                 
                 is_real_threat = False
@@ -454,7 +454,7 @@ elif st.session_state.get("authentication_status"):
 
     with tab4:
         st.subheader("🌍 全球即時威脅圖 與 航線風險分析")
-        st.markdown("系統已成功串接 **Geocoding API**, **Open-Meteo**, **OpenSky** 與 **全球即時禁飛區情報**。下圖顯示實際衝突區域（紅圈）與您的航線。")
+        st.markdown("系統已成功串接 **Geocoding API**, **Open-Meteo**, **OpenSky** 與 **全球即時禁飛區情報**。")
         
         airport_presets = [
             "TPE (台北 桃園機場)", "NRT (東京 成田機場)", "SIN (新加坡 樟宜機場)",
@@ -471,14 +471,14 @@ elif st.session_state.get("authentication_status"):
                 origin_input = origin_sel
 
         with route_col2:
-            dest_sel = st.selectbox("🛬 選擇降落機場 (Destination)", airport_presets, index=6) 
+            dest_sel = st.selectbox("🛬 選擇降落機場 (Destination)", airport_presets, index=1)
             if dest_sel == "🌍 自行輸入其他地點...":
                 dest_input = st.text_input("請輸入降落地點 (中英文皆可)：", placeholder="例如: 羅馬, 首爾 ICN...")
             else:
                 dest_input = dest_sel
 
         if origin_input and dest_input:
-            with st.spinner('📡 正在定位座標並抓取情報中...'):
+            with st.spinner('📡 正在定位座標並啟動情報雷達...'):
                 o_lat, o_lon = get_lat_lon(origin_input)
                 d_lat, d_lon = get_lat_lon(dest_input)
 
@@ -511,10 +511,13 @@ elif st.session_state.get("authentication_status"):
                 detour_lon = mid_lon + 15
                 if detour_lon > 180: detour_lon -= 360
                 elif detour_lon < -180: detour_lon += 360
+                
+                # 🛡️ 在畫圖前先抓情報，決定航線要畫成紅的還是綠的
+                live_alerts = get_route_conflict_alerts(origin_input, dest_input, mid_country)
+                is_route_dangerous = len(live_alerts) > 0
 
                 fig_map = go.Figure()
 
-                # 🌟 [保留] 真實世界禁飛區設定 (取代原本錯誤的隨機紅圈)
                 actual_conflict_zones = [
                     {"name": "⚠️ 東歐禁飛區", "lat": 48.0, "lon": 37.0, "radius_size": 150}, 
                     {"name": "⚠️ 紅海區域威脅", "lat": 15.0, "lon": 42.0, "radius_size": 100}, 
@@ -528,17 +531,22 @@ elif st.session_state.get("authentication_status"):
                         name=zone["name"], mode="markers", text=zone["name"], hoverinfo="text"
                     ))
 
+                # 🌟 [修復] 根據情報動態切換直飛航線顏色 (危險=紅色虛線，安全=綠色實線)
                 fig_map.add_trace(go.Scattergeo(
                     lat=[o_lat, mid_lat, d_lat], lon=[o_lon, mid_lon, d_lon],
-                    mode='lines+markers', line=dict(width=3, color='orange', dash='dot'),
-                    name="原訂航線 (直飛)", text=[origin_input[:5], "Midpoint", dest_input[:5]]
+                    mode='lines+markers', 
+                    line=dict(width=3, color='red' if is_route_dangerous else 'mediumseagreen', dash='dot' if is_route_dangerous else 'solid'),
+                    name="原訂航線 (高風險)" if is_route_dangerous else "標準航線 (安全)", 
+                    text=[origin_input[:5], "Midpoint", dest_input[:5]]
                 ))
 
-                fig_map.add_trace(go.Scattergeo(
-                    lat=[o_lat, detour_lat, d_lat], lon=[o_lon, detour_lon, d_lon],
-                    mode='lines+markers', line=dict(width=3, color='mediumseagreen'),
-                    name="備用航線 (安全繞飛)", text=[origin_input[:5], "Safe Waypoint", dest_input[:5]]
-                ))
+                # 🌟 [修復] 只有在有危險時，才畫出備用繞道路線
+                if is_route_dangerous:
+                    fig_map.add_trace(go.Scattergeo(
+                        lat=[o_lat, detour_lat, d_lat], lon=[o_lon, detour_lon, d_lon],
+                        mode='lines+markers', line=dict(width=3, color='mediumseagreen'),
+                        name="備用航線 (安全繞飛)", text=[origin_input[:5], "Safe Waypoint", dest_input[:5]]
+                    ))
 
                 if len(f_lats) > 0:
                     fig_map.add_trace(go.Scattergeo(
@@ -573,9 +581,7 @@ elif st.session_state.get("authentication_status"):
                 with map_col1:
                     st.error(f"### 🚨 航線周邊軍事與地緣政治警戒 (LIVE)")
                     
-                    live_alerts = get_route_conflict_alerts(origin_input, dest_input, mid_country)
-                    
-                    if live_alerts:
+                    if is_route_dangerous:
                         st.markdown("**📡 航線警戒雷達攔截情報：**")
                         for idx, alert in enumerate(live_alerts):
                             st.markdown(f"""
@@ -585,29 +591,40 @@ elif st.session_state.get("authentication_status"):
                             </div>
                             """, unsafe_allow_html=True)
                     else:
-                        st.success("✅ 目前系統掃描起降區域與中繼航路，未發現重大飛彈衝突之警戒。航線評估為安全。")
-                        
-                    st.markdown("---")    
-                    st.button("❌ 拒絕此航線並發布避讓指令", type="primary")
+                        st.success("✅ 目前系統掃描起降區域與中繼航路，未發現重大空襲或軍事衝突之警戒。航線評估為安全。")
 
                 with map_col2:
-                    st.success("### ✅ 系統建議：啟用動態安全繞道航線")
-                    st.markdown("""
-                    **改道路徑：** 若情報區出現警報，系統已自動計算偏置航路避開風險區。
-                    - **🛡️ 飛安評估：** 避開交戰與干擾熱區，導航訊號穩定。
-                    """)
-                    
-                    rough_dist = np.sqrt((o_lat-d_lat)**2 + (o_lon-d_lon)**2)
-                    delay_mins = int(rough_dist * 1.5 + np.random.randint(20, 45))
-                    fuel_tons = round(delay_mins * 0.15, 1)
+                    # 🌟 [修復] 只有情報危險時，才跳出繞道建議與拒絕按鈕
+                    if is_route_dangerous:
+                        st.warning("### ⚠️ 系統建議：啟用動態安全繞道航線")
+                        st.markdown("""
+                        **改道路徑：** 因航線周邊存在交戰威脅，系統已自動計算偏置航路避開風險區。
+                        - **🛡️ 飛安評估：** 避開交戰與干擾熱區，導航訊號穩定。
+                        """)
+                        
+                        rough_dist = np.sqrt((o_lat-d_lat)**2 + (o_lon-d_lon)**2)
+                        delay_mins = int(rough_dist * 1.5 + np.random.randint(20, 45))
+                        fuel_tons = round(delay_mins * 0.15, 1)
 
-                    st.markdown("#### 💰 繞道營運成本評估 (Delta Cost)")
-                    c1, c2, c3 = st.columns(3)
-                    c1.metric("增加飛行時間", f"+ {delay_mins} 分鐘", delta_color="inverse")
-                    c2.metric("額外燃油消耗", f"+ {fuel_tons} 噸", delta_color="inverse")
-                    c3.metric("航班準點率影響", "延遲抵達", delta_color="inverse")
-                    
-                    st.button("✅ 批准並重新簽派 (Approve & Dispatch)")
+                        st.markdown("#### 💰 繞道營運成本評估 (Delta Cost)")
+                        c1, c2, c3 = st.columns(3)
+                        c1.metric("增加飛行時間", f"+ {delay_mins} 分鐘", delta_color="inverse")
+                        c2.metric("額外燃油消耗", f"+ {fuel_tons} 噸", delta_color="inverse")
+                        c3.metric("航班準點率影響", "延遲抵達", delta_color="inverse")
+                        
+                        btn_col1, btn_col2 = st.columns(2)
+                        with btn_col1:
+                            st.button("❌ 拒絕此航線並取消航班", type="primary")
+                        with btn_col2:
+                            st.button("✅ 批准繞道並重新簽派")
+                    else:
+                        # 航路安全時顯示的簽派綠燈
+                        st.success("### ✅ 航路安全評估通過")
+                        st.markdown("""
+                        **標準路徑：** 目前天候與地緣政治皆在安全閾值內。
+                        - **🛡️ 飛安評估：** 沿線空域無重大軍事威脅，無須執行避讓程序。
+                        """)
+                        st.button("✅ 依原計畫簽派 (Standard Dispatch)", type="primary")
 
     with tab5:
         st.subheader("🤖 AI 戰略幕僚 (Virtual Advisor)")
