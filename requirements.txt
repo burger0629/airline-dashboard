@@ -9,3 +9,4 @@ requests
 geopy
 feedparser
 openai
+scikit-learn
