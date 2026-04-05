@@ -8,10 +8,10 @@ import datetime
 import requests
 import time
 from geopy.geocoders import Nominatim
-import feedparser  
-import urllib.parse 
+import feedparser
+import urllib.parse
 
-from auth_system import setup_authenticator 
+from auth_system import setup_authenticator
 
 # ==========================================
 # 0. 網頁基本設定 
@@ -75,7 +75,6 @@ elif st.session_state.get("authentication_status"):
 
         st.sidebar.divider()
         st.sidebar.subheader("🚧 系統資源限制 (Constraints)")
-        # 🌟 預算無上限 (max_value=None)，預設為 100,000 百萬 (1000億台幣)，級距改為 1000 百萬
         total_budget = st.sidebar.number_input("💰 可用總預算 (百萬台幣)", min_value=10.0, max_value=None, value=100000.0, step=1000.0, format="%.1f")
         max_labor_hours = st.sidebar.number_input("👷 最大可用維修工時 (小時)", min_value=1000, value=15000, step=500)
     else:
@@ -94,15 +93,24 @@ elif st.session_state.get("authentication_status"):
         new_scores = np.clip(current_scores + k_factors * np.sqrt(x), 0, 100)
         return np.sum(weights * (100 - new_scores))
 
-    con_budget = {'type': 'eq', 'fun': lambda x: np.sum(x) - total_budget}
+    # 🛠️ 修正1：改為不超過總預算即可 ('ineq')
+    con_budget = {'type': 'ineq', 'fun': lambda x: total_budget - np.sum(x)}
     labor_req = np.array([20, 80, 10, 5])
     con_labor = {'type': 'ineq', 'fun': lambda x: max_labor_hours - np.sum(x * labor_req)}
 
-    bounds = tuple((total_budget * 0.02, total_budget) for _ in range(4))
+    # 🛠️ 修正2：下限設為 0，避免極大預算時光是低標就讓工時爆表
+    bounds = tuple((0.0, total_budget) for _ in range(4))
     initial_guess = np.array([total_budget/4]*4)
 
     result = minimize(objective, initial_guess, args=(curr_scores, weights), method='SLSQP', bounds=bounds, constraints=[con_budget, con_labor])
-    allocations = result.x if result.success else initial_guess
+    
+    # 🛠️ 修正3：處理最佳化失敗的情況
+    if result.success:
+        allocations = result.x
+    else:
+        st.sidebar.warning(f"⚠️ 資源配置達極限 ({result.message})。")
+        allocations = initial_guess
+        
     alloc_dict = {cat: alloc for cat, alloc in zip(categories, allocations)}
 
     def get_risk_level_config(score):
@@ -317,7 +325,7 @@ elif st.session_state.get("authentication_status"):
                 delta = curr_scores[i] - prev_scores[i]
                 with m_cols[i % 2]:
                     st.metric(label=cat, value=f"{curr_scores[i]:.1f}", delta=f"{delta:.1f}")
-                    st.caption(f"💰 建議預算: **{alloc_dict[cat]:.1f} 百萬**")
+                    st.caption(f"💰 建議預算: **{alloc_dict[cat]:,.1f} 百萬**")
 
         st.divider()
         st.subheader("📋 年度趨勢診斷報告與具體改善行動書")
@@ -360,19 +368,18 @@ elif st.session_state.get("authentication_status"):
     with tab3:
         st.subheader("💸 財務沙盤推演 (ROI Simulator)")
         st.markdown("將「營運分數缺口」換算為真實營業損失預估，並手動調配預算測試投資報酬率。")
-        st.info(f"您目前共有 **{total_budget:.1f} 百萬** 的籌碼可以分配。")
+        st.info(f"您目前共有 **{total_budget:,.1f} 百萬** 的籌碼可以分配。")
         
         sim_cols = st.columns(4)
         sim_allocs = []
         for i, cat in enumerate(categories):
             with sim_cols[i]:
-                # 🌟 修復：移除 max_value，允許輸入極大數字
                 val = st.number_input(f"投入【{cat}】(百萬)", min_value=0.0, max_value=None, value=float(alloc_dict[cat]), step=100.0, format="%.1f", key=f"sim_{i}")
                 sim_allocs.append(val)
                 
         total_sim = sum(sim_allocs)
         if total_sim > total_budget:
-            st.error(f"⚠️ 預算超支！您分配了 {total_sim:.1f} 百萬，但總預算只有 {total_budget:.1f} 百萬。")
+            st.error(f"⚠️ 預算超支！您分配了 {total_sim:,.1f} 百萬，但總預算只有 {total_budget:,.1f} 百萬。")
         else:
             k_factors = np.array([1.5, 2.0, 1.2, 1.0])
             predicted_scores = np.clip(curr_scores + k_factors * np.sqrt(sim_allocs), 0, 100)
@@ -382,7 +389,7 @@ elif st.session_state.get("authentication_status"):
             predicted_loss = np.sum((100 - predicted_scores) * loss_factors)
             saved_money = current_loss - predicted_loss
             
-            st.success(f"✅ 模擬完成！可為公司 **減少 {saved_money:.1f} 百萬隱性損失**。")
+            st.success(f"✅ 模擬完成！可為公司 **減少 {saved_money:,.1f} 百萬隱性損失**。")
             
             fig_sim = go.Figure()
             fig_sim.add_trace(go.Scatterpolar(r=[100]*5, theta=categories+[categories[0]], fill=None, name='目標標準', line=dict(color='mediumseagreen', dash='dash')))
@@ -395,10 +402,9 @@ elif st.session_state.get("authentication_status"):
                 st.plotly_chart(fig_sim, use_container_width=True)
             with loss_cols[1]:
                 st.write("### 📉 投資報酬率分析")
-                st.metric("🔴 目前預估年度隱性損失", f"{current_loss:.1f} 百萬", "維持現狀的代價", delta_color="inverse")
-                st.metric("🟢 模擬後預估年度隱性損失", f"{predicted_loss:.1f} 百萬", f"投資報酬率 (ROI): {((saved_money/total_sim)*100):.1f}%" if total_sim>0 else "0%", delta_color="normal")
+                st.metric("🔴 目前預估年度隱性損失", f"{current_loss:,.1f} 百萬", "維持現狀的代價", delta_color="inverse")
+                st.metric("🟢 模擬後預估年度隱性損失", f"{predicted_loss:,.1f} 百萬", f"投資報酬率 (ROI): {((saved_money/total_sim)*100):.1f}%" if total_sim>0 else "0%", delta_color="normal")
 
-            # 🌟 回歸的 AI 財務分析按鈕
             st.divider()
             st.markdown("### 🤖 AI 財務深度診斷與改善建議")
             st.caption("根據您上方的預算分配模擬，由 AI 幕僚生成專業的財務與營運衝擊報告。")
@@ -530,7 +536,6 @@ elif st.session_state.get("authentication_status"):
                         name="✈️ 周邊民航機即時動態"
                     ))
 
-                # 🌟 修復：圖例高亮，白字清晰顯示
                 fig_map.update_geos(
                     projection_type="natural earth", showcountries=True, countrycolor="RebeccaPurple",
                     showland=True, landcolor="rgb(30, 30, 30)", oceancolor="rgb(10, 10, 20)", showocean=True,
