@@ -1,45 +1,45 @@
-import streamlit as st
-import numpy as np
-import pandas as pd
-import plotly.graph_objects as go
-import plotly.express as px
-from scipy.optimize import minimize
-import datetime
-import requests
-import time
-from geopy.geocoders import Nominatim
-import feedparser  
-import urllib.parse 
-
-from auth_system import setup_authenticator 
-
-# ==========================================
-# 0. 網頁基本設定 
-# ==========================================
-st.set_page_config(page_title="航空公司營運戰情室 (God Mode)", layout="wide", initial_sidebar_state="expanded")
-
-# ==========================================
-# 🔒 全局 API Key 讀取 
-# ==========================================
-try:
+    import streamlit as st
+    import numpy as np
+    import pandas as pd
+    import plotly.graph_objects as go
+    import plotly.express as px
+    from scipy.optimize import minimize
+    import datetime
+    import requests
+    import time
+    from geopy.geocoders import Nominatim
+    import feedparser  
+    import urllib.parse 
+    
+    from auth_system import setup_authenticator 
+    
+    # ==========================================
+    # 0. 網頁基本設定 
+    # ==========================================
+    st.set_page_config(page_title="航空公司營運戰情室 (God Mode)", layout="wide", initial_sidebar_state="expanded")
+    
+    # ==========================================
+    # 🔒 全局 API Key 讀取 
+    # ==========================================
+    try:
     api_key = st.secrets.get("OPENAI_API_KEY", "")
-except:
+    except:
     api_key = ""
-
-# ==========================================
-# 1. 系統登入大門 
-# ==========================================
-authenticator, config = setup_authenticator()
-st.subheader("🛡️ 航空戰情室 - 企業級安全登入")
-
-authenticator.login(location="main")
-
-if st.session_state.get("authentication_status") is False:
+    
+    # ==========================================
+    # 1. 系統登入大門 
+    # ==========================================
+    authenticator, config = setup_authenticator()
+    st.subheader("🛡️ 航空戰情室 - 企業級安全登入")
+    
+    authenticator.login(location="main")
+    
+    if st.session_state.get("authentication_status") is False:
     st.error("❌ 識別碼或通行密碼錯誤，拒絕存取。")
-elif st.session_state.get("authentication_status") is None:
+    elif st.session_state.get("authentication_status") is None:
     st.warning("⚠️ 系統已鎖定，請輸入高階主管識別碼以進入 God Mode 戰情室。")
     st.info("💡 測試帳號：`commander_lin` / 密碼：`123456`")
-elif st.session_state.get("authentication_status"):
+    elif st.session_state.get("authentication_status"):
     
     # ==========================================
     # 2. 登入成功後的核心戰情室程式碼
@@ -48,17 +48,17 @@ elif st.session_state.get("authentication_status"):
     username = st.session_state["username"]
     
     user_role = config["credentials"]["usernames"][username]["role"]
-
+    
     with st.sidebar:
         st.success(f"登入身分：{name} ({user_role})")
         authenticator.logout("安全登出系統", "sidebar", key="unique_logout_btn_123")
         st.markdown("---")
-
+    
     st.title("✈️ 航空公司營運戰情室 (Aviation War Room - 企業頂規版)")
     st.markdown("整合 **六級風險診斷**、**多維限制最佳化**、**財務衝擊預測**、**動態航線風險 (Live)** 與 **AI 戰略幕僚** 的決策支援系統。")
-
+    
     st.sidebar.header("📅 營運指標數據輸入")
-
+    
     if user_role == "Commander":
         st.sidebar.subheader("【本年度 (Current Year)】")
         # 1. 將 'eq' (等於) 改為 'ineq' (大於等於0，表示預算有剩餘是合法的)
@@ -66,10 +66,10 @@ elif st.session_state.get("authentication_status"):
     
     labor_req = np.array([20, 80, 10, 5])
     con_labor = {'type': 'ineq', 'fun': lambda x: max_labor_hours - np.sum(x * labor_req)}
-
+    
     bounds = tuple((total_budget * 0.02, total_budget) for _ in range(4))
     initial_guess = np.array([total_budget/4]*4)
-
+    
     # 執行最佳化
     result = minimize(objective, initial_guess, args=(curr_scores, weights), method='SLSQP', bounds=bounds, constraints=[con_budget, con_labor])
     
@@ -86,7 +86,7 @@ elif st.session_state.get("authentication_status"):
         prev_maint = st.sidebar.slider("2. 機隊維修 (去年)", 0.0, 100.0, 60.0, step=1.0)
         prev_otp = st.sidebar.slider("3. 航班調度 (去年)", 0.0, 100.0, 80.0, step=1.0)
         prev_service = st.sidebar.slider("4. 旅客服務 (去年)", 0.0, 100.0, 95.0, step=1.0)
-
+    
         st.sidebar.divider()
         st.sidebar.subheader("🚧 系統資源限制 (Constraints)")
         # 🌟 預算無上限 (max_value=None)，預設為 100,000 百萬 (1000億台幣)，級距改為 1000 百萬
@@ -97,28 +97,28 @@ elif st.session_state.get("authentication_status"):
         curr_safety, curr_maint, curr_otp, curr_service = 75.0, 45.0, 85.0, 90.0
         prev_safety, prev_maint, prev_otp, prev_service = 85.0, 60.0, 80.0, 95.0
         total_budget, max_labor_hours = 100000.0, 15000
-
+    
     categories = ['飛安控管', '機隊維修', '航班調度', '旅客服務']
     weights = np.array([0.40, 0.30, 0.20, 0.10])
     curr_scores = np.array([curr_safety, curr_maint, curr_otp, curr_service])
     prev_scores = np.array([prev_safety, prev_maint, prev_otp, prev_service])
-
+    
     def objective(x, current_scores, weights):
         k_factors = np.array([1.5, 2.0, 1.2, 1.0])
         new_scores = np.clip(current_scores + k_factors * np.sqrt(x), 0, 100)
         return np.sum(weights * (100 - new_scores))
-
+    
     con_budget = {'type': 'eq', 'fun': lambda x: np.sum(x) - total_budget}
     labor_req = np.array([20, 80, 10, 5])
     con_labor = {'type': 'ineq', 'fun': lambda x: max_labor_hours - np.sum(x * labor_req)}
-
+    
     bounds = tuple((total_budget * 0.02, total_budget) for _ in range(4))
     initial_guess = np.array([total_budget/4]*4)
-
+    
     result = minimize(objective, initial_guess, args=(curr_scores, weights), method='SLSQP', bounds=bounds, constraints=[con_budget, con_labor])
     allocations = result.x if result.success else initial_guess
     alloc_dict = {cat: alloc for cat, alloc in zip(categories, allocations)}
-
+    
     def get_risk_level_config(score):
         if score == 100.0: return ('perfect', "#00d26a", "🏆 卓越典範 (PERFECT) —— 系統處於理想狀態，維持卓越並分享經驗")
         elif score >= 81.0: return ('stable', "#28a745", "✅ 安全穩定 (STABLE) —— 績效優良，持續精益求精與深化文化")
@@ -126,7 +126,7 @@ elif st.session_state.get("authentication_status"):
         elif score >= 41.0: return ('serious', "#fd7e14", "🟠 橘色風險 (SERIOUS) —— 存在組織性漏洞，需深度重整與系統性對策")
         elif score >= 21.0: return ('high_risk', "#e74c3c", "🔴 紅色高危 (HIGH RISK) —— 系統防禦失效，需立即介入與危機處置")
         else: return ('catastrophic', "#ff3333", "🚨 災難崩潰 (CATASTROPHIC) —— 組織機能癱瘓，立即停止營運並全面重審")
-
+    
     def render_diagnosis_card(category, score, delta):
         level, main_color, status_text = get_risk_level_config(score)
         if delta >= 10: trend_label = f"📈 跨越式進步 (+{delta:.1f})"
@@ -134,7 +134,7 @@ elif st.session_state.get("authentication_status"):
         elif delta <= -10: trend_label = f"📉 潰雪式衰退 ({delta:.1f})"
         elif delta < 0: trend_label = f"↘️ 微幅下滑 ({delta:.1f})"
         else: trend_label = "➖ 表現持平"
-
+    
         st.markdown(f"""
         <div style="background-color: transparent; padding:20px; border-radius:10px; border: 1px solid {main_color}50; border-left: 8px solid {main_color}; margin-top: 20px; margin-bottom: 15px;">
             <h3 style="color: var(--text-color); margin-top:0;">
@@ -145,7 +145,7 @@ elif st.session_state.get("authentication_status"):
         </div>
         """, unsafe_allow_html=True)
         return level
-
+    
     knowledge_base = {
         '飛安控管': {
             'catastrophic': { 'reasons': ["安全管理系統 (SMS) 徹底癱瘓，內部甚至出現刻意隱瞞違規之現象。", "組織失去對風險的任何感知能力，隨時可能發生重大空難。"], 'actions': ["🚨 **[立即指令]** 總經理下令全機隊立即停飛，所有簽派與飛航作業強制暫停，等待外部聯合專案組進駐稽核。", "🚨 **[組織重整]** 解散現有安委會，凍結相關主管職權，重新考核核心關鍵崗位人員之飛安意識。"] },
@@ -180,15 +180,15 @@ elif st.session_state.get("authentication_status"):
             'perfect': { 'reasons': ["達成年度零客訴紀錄。建立世界級服務範本。"], 'actions': ["**[卓越維持]** 向全體服務團隊發放卓越獎金，並投入個人化常客忠誠度計畫。"] }
         }
     }
-
+    
     report_content = f"""# 航空公司年度營運診斷與資源最佳化報告
     **報告生成時間：** {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
     **總可用預算：** {total_budget} 百萬台幣 | **可用工時：** {max_labor_hours} 小時
-
+    
     ## 一、 最佳化預算配置建議\n"""
     for cat, alloc in alloc_dict.items():
         report_content += f"- **{cat}**：建議投入 {alloc:.1f} 百萬台幣\n"
-
+    
     report_content += "\n## 二、 深度專家診斷與改善行動方案\n"
     for i, cat in enumerate(categories):
         level, _, status_text = get_risk_level_config(curr_scores[i])
@@ -201,10 +201,10 @@ elif st.session_state.get("authentication_status"):
         report_content += "**🛠️ 具體執行方案：**\n"
         for action in data['actions']:
             report_content += f"- {action}\n"
-
+    
     st.sidebar.divider()
     st.sidebar.download_button(label="📄 匯出完整營運診斷書 (Report)", data=report_content, file_name="Airline_Operations_Report.md", mime="text/markdown")
-
+    
     # ==========================================
     # API 函數定義 (氣象、座標與【嚴格動態防護情報網】)
     # ==========================================
@@ -231,7 +231,7 @@ elif st.session_state.get("authentication_status"):
             return None, None
         except: 
             return None, None
-
+    
     @st.cache_data(show_spinner=False)
     def get_midpoint_region(lat, lon):
         try:
@@ -241,7 +241,7 @@ elif st.session_state.get("authentication_status"):
                 return loc.raw['address'].get('country', '')
         except: pass
         return ""
-
+    
     @st.cache_data(ttl=600, show_spinner=False)
     def get_live_weather(lat, lon):
         try:
@@ -261,7 +261,7 @@ elif st.session_state.get("authentication_status"):
             return wind_kt, temp_c, condition
         except:
             return "N/A", "N/A", "連線失敗"
-
+    
     @st.cache_data(ttl=600, show_spinner=False)
     def get_warzone_alerts(zone_name):
         try:
@@ -296,7 +296,7 @@ elif st.session_state.get("authentication_status"):
                 
                 if not is_real_threat and len(segments) == 1 and len(title_lower) < 60:
                     is_real_threat = True
-
+    
                 if is_real_threat:
                     clean_title = entry.title.rsplit(' - ', 1)[0]
                     pub_date = entry.published if 'published' in entry else ""
@@ -306,12 +306,12 @@ elif st.session_state.get("authentication_status"):
                     break
             return alerts
         except: return []
-
+    
     # ==========================================
     # 建立五大頁籤架構
     # ==========================================
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 核心診斷分配", "📈 長期趨勢", "💸 財務沙盤推演", "🌍 全球航線風險評估", "🤖 AI 戰略幕僚"])
-
+    
     with tab1:
         col1, col2 = st.columns([1.2, 1])
         with col1:
@@ -322,7 +322,7 @@ elif st.session_state.get("authentication_status"):
             fig.add_trace(go.Scatterpolar(r=list(curr_scores)+[curr_scores[0]], theta=categories+[categories[0]], fill='toself', name='本年度', line_color='royalblue', fillcolor='rgba(65, 105, 225, 0.2)'))
             fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), margin=dict(l=40, r=40, t=30, b=30))
             st.plotly_chart(fig, use_container_width=True)
-
+    
         with col2:
             st.subheader("📈 年度指標與最佳化分配 (YOY)")
             st.caption("✅ 系統已自動平衡「預算上限」與「維修工時」雙重限制。")
@@ -332,7 +332,7 @@ elif st.session_state.get("authentication_status"):
                 with m_cols[i % 2]:
                     st.metric(label=cat, value=f"{curr_scores[i]:.1f}", delta=f"{delta:.1f}")
                     st.caption(f"💰 建議預算: **{alloc_dict[cat]:.1f} 百萬**")
-
+    
         st.divider()
         st.subheader("📋 年度趨勢診斷報告與具體改善行動書")
         for i, cat in enumerate(categories):
@@ -350,7 +350,7 @@ elif st.session_state.get("authentication_status"):
                 st.markdown(f"#### 🛠️ 具體執行方案 (Action Plan)")
                 for action in data['actions']: st.markdown(f"- {action}")
                 st.markdown("<br>", unsafe_allow_html=True)
-
+    
     with tab2:
         st.subheader("📈 歷史營運數據趨勢分析 (五年期)")
         st.markdown("您可以上傳包含歷史數據的 CSV 檔案，或查看系統預設的模擬數據。")
@@ -370,7 +370,7 @@ elif st.session_state.get("authentication_status"):
         
         with st.expander("📄 查看詳細數據表格"):
             st.dataframe(df_trend, use_container_width=True)
-
+    
     with tab3:
         st.subheader("💸 財務沙盤推演 (ROI Simulator)")
         st.markdown("將「營運分數缺口」換算為真實營業損失預估，並手動調配預算測試投資報酬率。")
@@ -411,7 +411,7 @@ elif st.session_state.get("authentication_status"):
                 st.write("### 📉 投資報酬率分析")
                 st.metric("🔴 目前預估年度隱性損失", f"{current_loss:.1f} 百萬", "維持現狀的代價", delta_color="inverse")
                 st.metric("🟢 模擬後預估年度隱性損失", f"{predicted_loss:.1f} 百萬", f"投資報酬率 (ROI): {((saved_money/total_sim)*100):.1f}%" if total_sim>0 else "0%", delta_color="normal")
-
+    
             # 🌟 回歸的 AI 財務分析按鈕
             st.divider()
             st.markdown("### 🤖 AI 財務深度診斷與改善建議")
@@ -443,7 +443,7 @@ elif st.session_state.get("authentication_status"):
                             st.info(response.choices[0].message.content)
                         except Exception as e:
                             st.error(f"⚠️ 產生財務報告失敗，錯誤代碼: {e}")
-
+    
     with tab4:
         st.subheader("🌍 全球即時威脅圖 與 航線風險分析")
         st.markdown("系統已導入 **實體交戰區幾何檢測演算法 (Geometric Intersection)**。如果您的航路一片和平（如飛往東京），系統將直接給予綠燈，絕不亂發警報。")
@@ -453,21 +453,21 @@ elif st.session_state.get("authentication_status"):
             "FRA (法蘭克福機場)", "LHR (倫敦 希斯洛機場)", "JFK (紐約 甘迺迪機場)",
             "LAX (洛杉磯機場)", "DXB (杜拜機場)", "SYD (雪梨機場)", "🌍 自行輸入其他地點..."
         ]
-
+    
         route_col1, route_col2 = st.columns(2)
         with route_col1:
             origin_sel = st.selectbox("🛫 選擇起飛機場 (Origin)", airport_presets, index=0)
             origin_input = origin_sel if origin_sel != "🌍 自行輸入其他地點..." else st.text_input("請輸入起飛地點 (中英文皆可)：", placeholder="例如: 巴黎")
-
+    
         with route_col2:
             dest_sel = st.selectbox("🛬 選擇降落機場 (Destination)", airport_presets, index=1)
             dest_input = dest_sel if dest_sel != "🌍 自行輸入其他地點..." else st.text_input("請輸入降落地點 (中英文皆可)：", placeholder="例如: 羅馬")
-
+    
         if origin_input and dest_input:
             with st.spinner('📡 正在定位座標並計算物理碰撞預警...'):
                 o_lat, o_lon = get_lat_lon(origin_input)
                 d_lat, d_lon = get_lat_lon(dest_input)
-
+    
             if o_lat is None or d_lat is None:
                 st.error("❌ 找不到選定地點的座標。")
             elif o_lat == d_lat and o_lon == d_lon:
@@ -476,7 +476,7 @@ elif st.session_state.get("authentication_status"):
                 mid_lat, mid_lon = (o_lat + d_lat) / 2, (o_lon + d_lon) / 2
                 o_wind, o_temp, o_cond = get_live_weather(o_lat, o_lon)
                 d_wind, d_temp, d_cond = get_live_weather(d_lat, d_lon)
-
+    
                 try:
                     bbox = f"lamin={mid_lat-5}&lomin={mid_lon-5}&lamax={mid_lat+5}&lomax={mid_lon+5}"
                     air_res = requests.get(f"https://opensky-network.org/api/states/all?{bbox}", timeout=3).json()
@@ -487,13 +487,13 @@ elif st.session_state.get("authentication_status"):
                 except:
                     f_lats, f_lons = mid_lat + np.random.uniform(-8, 8, 30), mid_lon + np.random.uniform(-8, 8, 30)
                     traffic_status = "🟡 Traffic Simulated (OpenSky Offline)"
-
+    
                 actual_conflict_zones = [
                     {"name": "⚠️ 東歐交戰區 (烏俄)", "lat": 48.0, "lon": 37.0, "radius_size": 150, "threat_deg": 12.0}, 
                     {"name": "⚠️ 紅海區域威脅 (葉門)", "lat": 15.0, "lon": 42.0, "radius_size": 100, "threat_deg": 10.0}, 
                     {"name": "⚠️ 中東高度警戒區 (以/巴/伊/敘)", "lat": 34.0, "lon": 44.0, "radius_size": 180, "threat_deg": 15.0}   
                 ]
-
+    
                 is_route_dangerous = False
                 triggered_zone_name = ""
                 for i in range(21):
@@ -507,20 +507,20 @@ elif st.session_state.get("authentication_status"):
                             triggered_zone_name = zone["name"]
                             break
                     if is_route_dangerous: break
-
+    
                 detour_lat = max(min(mid_lat - 20, 89.0), -89.0)
                 detour_lon = mid_lon + 20
                 if detour_lon > 180: detour_lon -= 360
-
+    
                 fig_map = go.Figure()
-
+    
                 for zone in actual_conflict_zones:
                     fig_map.add_trace(go.Scattergeo(
                         lat=[zone["lat"]], lon=[zone["lon"]],
                         marker=dict(size=zone["radius_size"], color='red', opacity=0.15, line=dict(width=1, color='darkred')),
                         name=zone["name"], mode="markers", text=zone["name"], hoverinfo="text"
                     ))
-
+    
                 fig_map.add_trace(go.Scattergeo(
                     lat=[o_lat, d_lat] if not is_route_dangerous else [o_lat, mid_lat, d_lat], 
                     lon=[o_lon, d_lon] if not is_route_dangerous else [o_lon, mid_lon, d_lon],
@@ -529,21 +529,21 @@ elif st.session_state.get("authentication_status"):
                     name="原訂航線 (高風險)" if is_route_dangerous else "標準航線 (安全)", 
                     text=[origin_input[:5], dest_input[:5]] if not is_route_dangerous else [origin_input[:5], "Danger Zone", dest_input[:5]]
                 ))
-
+    
                 if is_route_dangerous:
                     fig_map.add_trace(go.Scattergeo(
                         lat=[o_lat, detour_lat, d_lat], lon=[o_lon, detour_lon, d_lon],
                         mode='lines+markers', line=dict(width=3, color='mediumseagreen'),
                         name="備用航線 (安全繞飛)", text=[origin_input[:5], "Safe Waypoint", dest_input[:5]]
                     ))
-
+    
                 if len(f_lats) > 0:
                     fig_map.add_trace(go.Scattergeo(
                         lat=f_lats, lon=f_lons,
                         mode='markers', marker=dict(symbol='circle', size=6, color='yellow', line=dict(width=1, color='black')),
                         name="✈️ 周邊民航機即時動態"
                     ))
-
+    
                 # 🌟 修復：圖例高亮，白字清晰顯示
                 fig_map.update_geos(
                     projection_type="natural earth", showcountries=True, countrycolor="RebeccaPurple",
@@ -557,14 +557,14 @@ elif st.session_state.get("authentication_status"):
                 )
                 st.caption(traffic_status)
                 st.plotly_chart(fig_map, use_container_width=True)
-
+    
                 st.markdown("### 🌤️ 即時飛航氣象簡報 (Live METAR/Weather)")
                 w_col1, w_col2 = st.columns(2)
                 with w_col1: st.info(f"**🛫 起飛地：{origin_input[:10]}**\n\n- 氣候：{o_cond} | 氣溫：{o_temp} °C | 風速：{o_wind} 節")
                 with w_col2: st.success(f"**🛬 降落地：{dest_input[:10]}**\n\n- 氣候：{d_cond} | 氣溫：{d_temp} °C | 風速：{d_wind} 節")
-
+    
                 st.divider()
-
+    
                 map_col1, map_col2 = st.columns(2)
                 with map_col1:
                     if is_route_dangerous:
@@ -580,14 +580,14 @@ elif st.session_state.get("authentication_status"):
                         st.success(f"### 🛡️ 航線地緣政治情報")
                         st.success("✅ 經系統幾何比對，本航路未觸及全球現有之武裝交戰區。空域狀態評估為安全。")
                         st.info("💡 提示：您可以嘗試將目的地設為「法蘭克福」或「杜拜」，以測試交戰區的動態繞道與情報預警功能。")
-
+    
                 with map_col2:
                     if is_route_dangerous:
                         st.warning("### ⚠️ 系統建議：啟用動態安全繞道航線")
                         rough_dist = np.sqrt((o_lat-d_lat)**2 + (o_lon-d_lon)**2)
                         delay_mins = int(rough_dist * 1.5 + np.random.randint(20, 45))
                         fuel_tons = round(delay_mins * 0.15, 1)
-
+    
                         st.markdown("#### 💰 繞道營運成本評估 (Delta Cost)")
                         c1, c2, c3 = st.columns(3)
                         c1.metric("增加飛行時間", f"+ {delay_mins} 分鐘", delta_color="inverse")
@@ -601,7 +601,7 @@ elif st.session_state.get("authentication_status"):
                         st.success("### ✅ 航路安全評估通過")
                         st.markdown("**標準路徑：** 物理幾何與空域情報皆在安全閾值內。\n- **🛡️ 飛安評估：** 沿線空域無重大軍事威脅，無須執行避讓程序。")
                         st.button("✅ 依原計畫簽派 (Standard Dispatch)", type="primary")
-
+    
     with tab5:
         st.subheader("🤖 AI 戰略幕僚 (Virtual Advisor)")
         st.info(f"🧠 **系統 Context 已同步**：內外部數據 皆已連線。")
