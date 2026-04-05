@@ -687,7 +687,16 @@ elif st.session_state.get("authentication_status"):
                             # 🚀 升級 3：RAG 飛安事故歷史知識庫 (單行字串究極防呆版)
                             # ==========================================
                             historical_db = "- [GE235空難教訓] 單發動機失效時, 錯誤的 CRM 溝通與未遵守 SOP 關錯發動機將導致災難。\n- [CI611空難教訓] 機隊維修的金屬疲勞與結構損傷若無確實記錄與追蹤, 將在數年後引發空中解體。\n- [跨國空域風險] 航班若經過地緣政治不穩定區(如 MH17 事件), 航路選擇的優先級必須是物理安全大於油耗經濟性。"
-                            system_prompt = f"你是一位擁有20年經驗的「航空公司營運與飛航安全戰略幕僚」。\n[數據支撐：內外部融合 Context]\n   【內部妥善率】安:{curr_safety}, 修:{curr_maint}, 調:{curr_otp}, 服:{curr_service}\n   【外部 LIVE 情報】當前監控航線：{route_str} | 警戒判定：{alert_str}\n\n[核心決策原則庫]\n{historical_db}\n\n請嚴格根據上述內部妥善率與外部情報回答使用者的問題。若分數呈現高風險，請務必引用[核心決策原則庫]中的歷史教訓給予嚴厲警告。"
+                            system_prompt = (
+                                "你是一位擁有20年經驗的「航空公司營運與飛航安全戰略幕僚」。\n"
+                                "[數據支撐：內外部融合 Context]\n"
+                                f"   【內部妥善率】安:{curr_safety}, 修:{curr_maint}, 調:{curr_otp}, 服:{curr_service}\n"
+                                f"   【外部 LIVE 情報】當前監控航線：{route_str} | 警戒判定：{alert_str}\n\n"
+                                "[核心決策原則庫]\n"
+                                f"{historical_db}\n\n"
+                                "請嚴格根據上述內部妥善率與外部情報回答使用者的問題。若分數呈現高風險，"
+                                "請優先引用[核心決策原則庫]的教訓，或者「自行檢索全球航空史上最吻合當下情境的著名空難案例（如法航447、特內里費空難等）」來給予最嚴厲的戰略警告。"
+                            )
                             
                             response = client.chat.completions.create(
                                 model="gpt-4o-mini",
