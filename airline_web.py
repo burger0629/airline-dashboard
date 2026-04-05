@@ -61,13 +61,27 @@ elif st.session_state.get("authentication_status"):
 
     if user_role == "Commander":
         st.sidebar.subheader("【本年度 (Current Year)】")
-        curr_safety = st.sidebar.slider("1. 飛安控管 (今年)", 0.0, 100.0, 75.0, step=1.0)
-        curr_maint = st.sidebar.slider("2. 機隊維修 (今年)", 0.0, 100.0, 45.0, step=1.0)
-        curr_otp = st.sidebar.slider("3. 航班調度 (今年)", 0.0, 100.0, 85.0, step=1.0)
-        curr_service = st.sidebar.slider("4. 旅客服務 (今年)", 0.0, 100.0, 90.0, step=1.0)
+        # 1. 將 'eq' (等於) 改為 'ineq' (大於等於0，表示預算有剩餘是合法的)
+    con_budget = {'type': 'ineq', 'fun': lambda x: total_budget - np.sum(x)}
+    
+    labor_req = np.array([20, 80, 10, 5])
+    con_labor = {'type': 'ineq', 'fun': lambda x: max_labor_hours - np.sum(x * labor_req)}
 
-        st.sidebar.divider()
-        st.sidebar.subheader("【前年度 (Last Year)】")
+    bounds = tuple((total_budget * 0.02, total_budget) for _ in range(4))
+    initial_guess = np.array([total_budget/4]*4)
+
+    # 執行最佳化
+    result = minimize(objective, initial_guess, args=(curr_scores, weights), method='SLSQP', bounds=bounds, constraints=[con_budget, con_labor])
+    
+    # 2. 增加錯誤顯示，幫助未來除錯，而不是默默平分
+    if result.success:
+        allocations = result.x
+    else:
+        # 如果還是無解，在側邊欄跳出警告，並顯示 SciPy 的錯誤訊息
+        st.sidebar.warning(f"⚠️ 資源配置無法最佳化 ({result.message})。請檢查是否工時極度不足或預算設定異常。")
+        allocations = initial_guess
+        
+    alloc_dict = {cat: alloc for cat, alloc in zip(categories, allocations)}
         prev_safety = st.sidebar.slider("1. 飛安控管 (去年)", 0.0, 100.0, 85.0, step=1.0)
         prev_maint = st.sidebar.slider("2. 機隊維修 (去年)", 0.0, 100.0, 60.0, step=1.0)
         prev_otp = st.sidebar.slider("3. 航班調度 (去年)", 0.0, 100.0, 80.0, step=1.0)
