@@ -11,6 +11,7 @@ from geopy.geocoders import Nominatim
 import feedparser
 import urllib.parse
 import sqlite3
+from sklearn.linear_model import LinearRegression
 
 from auth_system import setup_authenticator
 
@@ -31,7 +32,7 @@ except:
 # 1. 系統登入大門 
 # ==========================================
 authenticator, config = setup_authenticator()
-st.subheader("🛡️ 航空戰情室 ")
+st.subheader("🛡️ 航空戰情室")
 
 authenticator.login(location="main")
 
@@ -42,12 +43,8 @@ elif st.session_state.get("authentication_status") is None:
     st.info("💡 測試帳號：`commander_lin` / 密碼：`123456`")
 elif st.session_state.get("authentication_status"):
     
-    # ==========================================
-    # 2. 登入成功後的核心戰情室程式碼
-    # ==========================================
     name = st.session_state["name"]
     username = st.session_state["username"]
-    
     user_role = config["credentials"]["usernames"][username]["role"]
 
     with st.sidebar:
@@ -55,24 +52,24 @@ elif st.session_state.get("authentication_status"):
         authenticator.logout("安全登出系統", "sidebar", key="unique_logout_btn_123")
         st.markdown("---")
 
-    st.title("✈️ 航空公司營運戰情室 ")
+    st.title("✈️ 航空公司營運戰情室")
     st.markdown("整合 **六級風險診斷**、**多維限制最佳化**、**財務衝擊預測**、**動態航線風險 (Live)** 與 **AI 戰略幕僚** 的決策支援系統。")
 
     st.sidebar.header("📅 營運指標數據輸入")
 
     if user_role == "Commander":
         st.sidebar.subheader("【本年度 (Current Year)】")
-        curr_safety = st.sidebar.slider("1. 飛安控管 ", 0.0, 100.0, 75.0, step=1.0)
-        curr_maint = st.sidebar.slider("2. 機隊維修 ", 0.0, 100.0, 45.0, step=1.0)
-        curr_otp = st.sidebar.slider("3. 航班調度 ", 0.0, 100.0, 85.0, step=1.0)
-        curr_service = st.sidebar.slider("4. 旅客服務 ", 0.0, 100.0, 90.0, step=1.0)
+        curr_safety = st.sidebar.slider("1. 飛安控管", 0.0, 100.0, 75.0, step=1.0)
+        curr_maint = st.sidebar.slider("2. 機隊維修", 0.0, 100.0, 45.0, step=1.0)
+        curr_otp = st.sidebar.slider("3. 航班調度", 0.0, 100.0, 85.0, step=1.0)
+        curr_service = st.sidebar.slider("4. 旅客服務", 0.0, 100.0, 90.0, step=1.0)
 
         st.sidebar.divider()
         st.sidebar.subheader("【前年度 (Last Year)】")
-        prev_safety = st.sidebar.slider("1. 飛安控管 ", 0.0, 100.0, 85.0, step=1.0)
-        prev_maint = st.sidebar.slider("2. 機隊維修 ", 0.0, 100.0, 60.0, step=1.0)
-        prev_otp = st.sidebar.slider("3. 航班調度 ", 0.0, 100.0, 80.0, step=1.0)
-        prev_service = st.sidebar.slider("4. 旅客服務 ", 0.0, 100.0, 95.0, step=1.0)
+        prev_safety = st.sidebar.slider("1. 飛安控管 (去年)", 0.0, 100.0, 85.0, step=1.0)
+        prev_maint = st.sidebar.slider("2. 機隊維修 (去年)", 0.0, 100.0, 60.0, step=1.0)
+        prev_otp = st.sidebar.slider("3. 航班調度 (去年)", 0.0, 100.0, 80.0, step=1.0)
+        prev_service = st.sidebar.slider("4. 旅客服務 (去年)", 0.0, 100.0, 95.0, step=1.0)
 
         st.sidebar.divider()
         st.sidebar.subheader("🚧 系統資源限制 (Constraints)")
@@ -90,40 +87,30 @@ elif st.session_state.get("authentication_status"):
     prev_scores = np.array([prev_safety, prev_maint, prev_otp, prev_service])
 
     # ==========================================
-    # 升級 4：多維度交叉限制最佳化演算法
+    # 🚀 升級 4：多維度交叉限制最佳化演算法
     # ==========================================
     def objective(x, current_scores, weights):
         k_factors = np.array([1.5, 2.0, 1.2, 1.0])
         new_scores = current_scores + k_factors * np.sqrt(x)
         
         # 交叉懲罰機制：維修是飛安的基石
-        # 如果分配給「機隊維修」(x[1]) 的預算低於總預算的 15%，飛安分數會遭到非線性扣減
         maint_ratio = x[1] / (total_budget + 1e-9)
         safety_penalty = 0
         if maint_ratio < 0.15:
-            # 預算越低，懲罰越重 (最大扣 20 分)
             safety_penalty = 20 * (0.15 - maint_ratio) / 0.15 
             
         new_scores[0] -= safety_penalty
         new_scores = np.clip(new_scores, 0, 100)
-        
-        return np.sum(weights * (100 - new_scores))
-        k_factors = np.array([1.5, 2.0, 1.2, 1.0])
-        new_scores = np.clip(current_scores + k_factors * np.sqrt(x), 0, 100)
         return np.sum(weights * (100 - new_scores))
 
-    # 🛠️ 修正1：改為不超過總預算即可 ('ineq')
     con_budget = {'type': 'ineq', 'fun': lambda x: total_budget - np.sum(x)}
     labor_req = np.array([20, 80, 10, 5])
     con_labor = {'type': 'ineq', 'fun': lambda x: max_labor_hours - np.sum(x * labor_req)}
-
-    # 🛠️ 修正2：下限設為 0，避免極大預算時光是低標就讓工時爆表
     bounds = tuple((0.0, total_budget) for _ in range(4))
     initial_guess = np.array([total_budget/4]*4)
 
     result = minimize(objective, initial_guess, args=(curr_scores, weights), method='SLSQP', bounds=bounds, constraints=[con_budget, con_labor])
     
-    # 🛠️ 修正3：處理最佳化失敗的情況
     if result.success:
         allocations = result.x
     else:
@@ -131,8 +118,9 @@ elif st.session_state.get("authentication_status"):
         allocations = initial_guess
         
     alloc_dict = {cat: alloc for cat, alloc in zip(categories, allocations)}
+
     # ==========================================
-    # 升級 1：SQLite 決策數據持久化
+    # 🚀 升級 1：SQLite 決策數據持久化
     # ==========================================
     def log_decision_to_db(user, budget, safety_alloc, maint_alloc, otp_alloc, serv_alloc, result_msg):
         try:
@@ -149,7 +137,6 @@ elif st.session_state.get("authentication_status"):
         except Exception as e:
             st.sidebar.error(f"資料庫寫入失敗: {e}")
 
-    # 執行寫入
     log_decision_to_db(name, total_budget, allocations[0], allocations[1], allocations[2], allocations[3], "Success" if result.success else "Failed")
 
     def get_risk_level_config(score):
@@ -184,7 +171,7 @@ elif st.session_state.get("authentication_status"):
             'catastrophic': { 'reasons': ["安全管理系統 (SMS) 徹底癱瘓，內部甚至出現刻意隱瞞違規之現象。", "組織失去對風險的任何感知能力，隨時可能發生重大空難。"], 'actions': ["🚨 **[立即指令]** 總經理下令全機隊立即停飛，所有簽派與飛航作業強制暫停，等待外部聯合專案組進駐稽核。", "🚨 **[組織重整]** 解散現有安委會，凍結相關主管職權，重新考核核心關鍵崗位人員之飛安意識。"] },
             'high_risk': { 'reasons': ["防禦機制出現多重失效，「瑞士起司理論」漏洞穿透組織各層級。", "基層對「公正文化」完全失去信任，自願通報機制斷絕。"], 'actions': ["⚠️ **[危機處置]** 暫停高風險/易受天候影響航線運行，啟動無預警全機隊安全停飛檢查 (Stand-down)。", "⚠️ **[系統重審]** 全面盤點 SMS 運作狀況，重新驗證飛行員執照考勤與疲勞管理 (FRMS) 指標是否失真。"] },
             'serious': { 'reasons': ["存在組織性「孤島效應」，機務、航務與簽派數據無法有效橫向整合。", "SMS 退化為被動式的「事後檢討機制」，缺乏主動預測能力。"], 'actions': ["**[深度對策]** 成立總經理直屬專案小組，強制打通跨部門飛航數據壁壘。", "**[風險危害]** 針對輕微異常事件 (Incidents) 進行根本原因分析 (RCA)，找出組織層級的系統性漏洞。"] },
-            'caution': { 'reasons': ["飛行員面臨潛在的疲勞累積，情境警覺 (Situational Awareness) 開始下滑。", "組員資源管理 (CRM) 訓練成效降低，駕駛艙內質疑權威能力轉弱。"], 'actions': ["**[主動監控]** 擴大 FOQA 飛行數據監測之分析深度，設定重落地、超速等偏差行為之嚴格警報門檻。", "**[組員資源]** 針對全體機師辦理「CRM 高階複訓」，強化面對複雜情境下的溝通效率與共同決策能力。"] },
+            'caution': { 'reasons': ["飛行員面臨潛在的疲勞累積，情境警覺 (Situational Awareness) 開始下滑。", "組員資源管理 (CRM) 訓練成效降低，駕駛艙內質疑權威能力轉弱。"], 'actions': ["**[主怒監控]** 擴大 FOQA 飛行數據監測之分析深度，設定重落地、超速等偏差行為之嚴格警報門檻。", "**[組員資源]** 針對全體機師辦理「CRM 高階複訓」，強化面對複雜情境下的溝通效率與共同決策能力。"] },
             'stable': { 'reasons': ["防禦機制運作良好，數據監控與人員訓練均達標。"], 'actions': ["**[精益求精]** 系統運作穩健。請鼓勵公正文化 (Just Culture) 自願通報，找出隱藏在優良數據下的微小偏差。"] },
             'perfect': { 'reasons': ["已建立世界級飛安範本。組織上下視飛安為最高信仰。"], 'actions': ["**[卓越維持]** 策劃高強度、無預警的「重大空難場景模擬演習」，壓力測試組織之極端應變肌肉記憶。"] }
         },
@@ -214,10 +201,6 @@ elif st.session_state.get("authentication_status"):
         }
     }
 
-   
-    # ==========================================
-    # API 函數定義 (氣象、座標與【嚴格動態防護情報網】)
-    # ==========================================
     @st.cache_data(show_spinner=False)
     def get_lat_lon(location_name):
         preset_coords = {
@@ -290,8 +273,6 @@ elif st.session_state.get("authentication_status"):
             alerts = []
             for entry in feed.entries:
                 title_lower = entry.title.lower()
-                
-                # 🚫 排除軍購備戰與娛樂假新聞
                 exclusions = ['部署', '配備', '政策', '反擊', '研發', '採購', '試射', '軍售', '合約', '升級', '庫存',
                               '小說', '電影', '遊戲', '劇', '年前', '演習', '演練', '測試', '速寫', '回顧', '歷史', '紀念', '模擬']
                 if any(x in title_lower for x in exclusions):
@@ -317,9 +298,6 @@ elif st.session_state.get("authentication_status"):
             return alerts
         except: return []
 
-    # ==========================================
-    # 建立五大頁籤架構
-    # ==========================================
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 核心診斷分配", "📈 長期趨勢", "💸 財務沙盤推演", "🌍 全球航線風險評估", "🤖 AI 戰略幕僚"])
 
     with tab1:
@@ -374,38 +352,29 @@ elif st.session_state.get("authentication_status"):
             df_trend = pd.DataFrame({'年份': years, '飛安控管': [92, 88, 85, prev_safety, curr_safety], '機隊維修': [80, 75, 65, prev_maint, curr_maint], '航班調度': [88, 85, 82, prev_otp, curr_otp], '旅客服務': [85, 90, 92, prev_service, curr_service]})
         
         # ==========================================
-        # 升級 2：Sklearn 時間序列趨勢預測
+        # 🚀 升級 2：Sklearn 時間序列趨勢預測
         # ==========================================
-        from sklearn.linear_model import LinearRegression
-        
-        # 準備訓練特徵 (將年份轉為數字 1, 2, 3, 4, 5)
         X_train = np.array([1, 2, 3, 4, 5]).reshape(-1, 1)
-        next_year = np.array([[6]]) # 預測第 6 年
+        next_year = np.array([[6]]) 
         
-        predicted_scores = []
+        predicted_scores_trend = []
         for col in categories:
             y_train = df_trend[col].values
             model = LinearRegression().fit(X_train, y_train)
-            pred = np.clip(model.predict(next_year)[0], 0, 100) # 確保分數在 0-100
-            predicted_scores.append(round(pred, 1))
+            pred = np.clip(model.predict(next_year)[0], 0, 100) 
+            predicted_scores_trend.append(round(pred, 1))
             
-        # 將預測結果加入 DataFrame
-        df_trend.loc[len(df_trend)] = ['2027(AI預測)'] + predicted_scores
+        df_trend.loc[len(df_trend)] = ['2027(AI預測)'] + predicted_scores_trend
+
         df_melted = df_trend.melt(id_vars=['年份'], var_name='營運指標', value_name='分數')
         fig_line = px.line(df_melted, x='年份', y='分數', color='營運指標', markers=True, title='各項營運指標長期趨勢追蹤')
         fig_line.update_layout(yaxis=dict(range=[0, 100]))
-        
-        # 🛠️ 修復小數點年份問題：強制 X 軸將年份視為「獨立類別」而非連續數字
         fig_line.update_xaxes(type='category')
-        
         st.plotly_chart(fig_line, use_container_width=True)
         
         with st.expander("📄 查看詳細數據表格"):
             st.dataframe(df_trend, use_container_width=True)
 
-        # ==========================================
-        # 🚀 新增：AI 五年期趨勢成因診斷模組
-        # ==========================================
         st.divider()
         st.markdown("### 🤖 AI 歷史營運軌跡與成因診斷")
         st.caption("結合航空實務經驗，深度挖掘五年數據波動，找出隱藏在趨勢背後的結構性原因。")
@@ -419,7 +388,6 @@ elif st.session_state.get("authentication_status"):
                         from openai import OpenAI
                         client = OpenAI(api_key=api_key)
                         
-                        # 將 DataFrame 資料轉化為純文字表格，以便 AI 閱讀
                         trend_data_str = df_trend.to_string(index=False)
                         
                         trend_prompt = f"""
@@ -439,8 +407,6 @@ elif st.session_state.get("authentication_status"):
                             messages=[{"role": "user", "content": trend_prompt}],
                             temperature=0.7
                         )
-                        
-                        # 以視覺化的方式呈現報告
                         st.success("✅ 分析完成！以下為 AI 戰略幕僚提供的深度診斷：")
                         st.info(response.choices[0].message.content)
                     except Exception as e:
@@ -485,13 +451,12 @@ elif st.session_state.get("authentication_status"):
                 st.write("### 📉 投資報酬率分析")
                 st.metric("🔴 目前預估年度隱性損失", f"{current_loss:,.1f} 百萬", "維持現狀的代價", delta_color="inverse")
                 
-                # 優化：計算 ROI，並將顯示精度提高到小數點後三位
                 roi_value = (saved_money / total_sim * 100) if total_sim > 0 else 0
                 st.metric("🟢 模擬後預估年度隱性損失", f"{predicted_loss:,.1f} 百萬", f"投資報酬率 (ROI): {roi_value:.3f}%", delta_color="normal")
                 
-                # 優化：新增極端值的防呆提示
                 if roi_value < 1.0 and total_sim > current_loss:
                     st.caption("💡 **系統提示**：投資金額遠大於可挽回損失，已觸發嚴重的「邊際效應遞減（Diminishing Returns）」，再投入資金也無法顯著提升分數，建議大幅降低預算。")
+            
             st.divider()
             st.markdown("### 🤖 AI 財務深度診斷與改善建議")
             st.caption("根據您上方的預算分配模擬，由 AI 幕僚生成專業的財務與營運衝擊報告。")
@@ -552,7 +517,6 @@ elif st.session_state.get("authentication_status"):
             elif o_lat == d_lat and o_lon == d_lon:
                 st.warning("⚠️ 起降地點相同。")
             else:
-                # 🛠️ 修正1：計算最短經度差 (處理太平洋換日線)
                 diff_lon = d_lon - o_lon
                 if diff_lon > 180:
                     diff_lon -= 360
@@ -590,7 +554,6 @@ elif st.session_state.get("authentication_status"):
                     f = i / 20.0
                     c_lat = o_lat + (d_lat - o_lat) * f
                     
-                    # 🛠️ 修正2：套用換日線經度差，避免錯誤撞擊紅圈
                     c_lon = o_lon + diff_lon * f
                     if c_lon > 180: c_lon -= 360
                     elif c_lon < -180: c_lon += 360
@@ -603,8 +566,6 @@ elif st.session_state.get("authentication_status"):
                             break
                     if is_route_dangerous: break
 
-                # 🛠️ 升級：智能雙中繼點南向繞飛演算法
-                # 往南壓低緯度避開東歐與中東核心，並配合東西向動態調整
                 wp1_lat = min(o_lat, d_lat) - 15  
                 wp1_lon = o_lon + (d_lon - o_lon) * 0.35
                 
@@ -631,7 +592,6 @@ elif st.session_state.get("authentication_status"):
 
                 if is_route_dangerous:
                     fig_map.add_trace(go.Scattergeo(
-                        # 使用四個點 (起點, 繞飛點1, 繞飛點2, 終點) 畫出平滑包絡線
                         lat=[o_lat, wp1_lat, wp2_lat, d_lat], 
                         lon=[o_lon, wp1_lon, wp2_lon, d_lon],
                         mode='lines+markers', line=dict(width=3, color='mediumseagreen'),
@@ -648,7 +608,6 @@ elif st.session_state.get("authentication_status"):
                 fig_map.update_geos(
                     projection_type="natural earth", showcountries=True, countrycolor="RebeccaPurple",
                     showland=True, landcolor="rgb(30, 30, 30)", oceancolor="rgb(10, 10, 20)", showocean=True,
-                    # 將舊的 detour_lat 替換為新的 wp1_lat 與 wp2_lon 來計算地圖邊界
                     lataxis_range=[min(o_lat, d_lat, wp1_lat if is_route_dangerous else d_lat)-15, max(o_lat, d_lat, wp1_lat if is_route_dangerous else d_lat)+15], 
                     lonaxis_range=[min(o_lon, d_lon, wp1_lon if is_route_dangerous else d_lon)-15, max(o_lon, d_lon, wp2_lon if is_route_dangerous else d_lon)+15]
                 )
@@ -724,38 +683,11 @@ elif st.session_state.get("authentication_status"):
                             route_str = f"{locals().get('origin_input', '未知')} 飛往 {locals().get('dest_input', '未知')}"
                             alert_str = f"觸發實體交戰區: {locals().get('triggered_zone_name', '')}" if locals().get('is_route_dangerous', False) else "航線未觸及全球重大交戰區，評估為安全。"
                             
-                            system_prompt = f"""
-                           
-                           # ==========================================
-                            # 升級 3：RAG 飛安事故歷史知識庫 (終極防呆版)
                             # ==========================================
-                            historical_db = (
-                                "- [GE235空難教訓] 單發動機失效時, 錯誤的 CRM 溝通與未遵守 SOP 關錯發動機將導致災難。\n"
-                                "- [CI611空難教訓] 機隊維修的金屬疲勞與結構損傷若無確實記錄與追蹤, 將在數年後引發空中解體。\n"
-                                "- [跨國空域風險] 航班若經過地緣政治不穩定區(如 MH17 事件), 航路選擇的優先級必須是物理安全大於油耗經濟性。"
-                            )
-                            
-                            system_prompt = (
-                                "你是一位擁有20年經驗的「航空公司營運與飛航安全戰略幕僚」。\n"
-                                "[數據支撐：內外部融合 Context]\n"
-                                f"   【內部妥善率】安:{curr_safety}, 修:{curr_maint}, 調:{curr_otp}, 服:{curr_service}\n"
-                                f"   【外部 LIVE 情報】當前監控航線：{route_str} | 警戒判定：{alert_str}\n\n"
-                                "[核心決策原則庫]\n"
-                                f"{historical_db}\n\n"
-                                "請嚴格根據上述內部妥善率與外部情報回答使用者的問題。若分數呈現高風險，請務必引用[核心決策原則庫]中的歷史教訓給予嚴厲警告。"
-                            )
-                            
-                            [核心決策原則庫]
-                            {historical_db}
-                            
-                            請嚴格根據上述內部妥善率與外部情報回答使用者的問題。若分數呈現高風險，請務必引用[核心決策原則庫]中的歷史教訓給予嚴厲警告。
-                            """
-                            
-                            [核心決策原則庫]
-                            {historical_db}
-                            
-                            請嚴格根據上述內部妥善率與外部情報回答使用者的問題。若分數呈現高風險，請務必引用[核心決策原則庫]中的歷史教訓給予嚴厲警告。
-                            """
+                            # 🚀 升級 3：RAG 飛安事故歷史知識庫 (單行字串究極防呆版)
+                            # ==========================================
+                            historical_db = "- [GE235空難教訓] 單發動機失效時, 錯誤的 CRM 溝通與未遵守 SOP 關錯發動機將導致災難。\n- [CI611空難教訓] 機隊維修的金屬疲勞與結構損傷若無確實記錄與追蹤, 將在數年後引發空中解體。\n- [跨國空域風險] 航班若經過地緣政治不穩定區(如 MH17 事件), 航路選擇的優先級必須是物理安全大於油耗經濟性。"
+                            system_prompt = f"你是一位擁有20年經驗的「航空公司營運與飛航安全戰略幕僚」。\n[數據支撐：內外部融合 Context]\n   【內部妥善率】安:{curr_safety}, 修:{curr_maint}, 調:{curr_otp}, 服:{curr_service}\n   【外部 LIVE 情報】當前監控航線：{route_str} | 警戒判定：{alert_str}\n\n[核心決策原則庫]\n{historical_db}\n\n請嚴格根據上述內部妥善率與外部情報回答使用者的問題。若分數呈現高風險，請務必引用[核心決策原則庫]中的歷史教訓給予嚴厲警告。"
                             
                             response = client.chat.completions.create(
                                 model="gpt-4o-mini",
@@ -763,13 +695,12 @@ elif st.session_state.get("authentication_status"):
                                 temperature=0.7
                             )
                             st.write(response.choices[0].message.content)
-                        except:
-                            st.error("⚠️ AI 幕僚連線失敗")
+                        except Exception as e:
+                            st.error(f"⚠️ AI 幕僚連線失敗: {e}")
 
     # ==========================================
-    # 🚀 終極升級：自動生成精美 HTML 企業級報告 (含財務與歷史趨勢)
+    # 🚀 自動生成精美 HTML 企業級報告 (含財務與歷史趨勢)
     # ==========================================
-    # 預先計算最佳化後的財務 ROI 指標
     rep_k_factors = np.array([1.5, 2.0, 1.2, 1.0])
     rep_predicted_scores = np.clip(curr_scores + rep_k_factors * np.sqrt(allocations), 0, 100)
     rep_loss_factors = [2.5, 3.0, 1.8, 0.5]
@@ -778,7 +709,6 @@ elif st.session_state.get("authentication_status"):
     rep_saved_money = rep_current_loss - rep_predicted_loss
     rep_roi = (rep_saved_money / np.sum(allocations) * 100) if np.sum(allocations) > 0 else 0
 
-    # [組合 HTML: 1. 財務報表]
     fin_table_html = "<table><thead><tr><th>營運指標</th><th>目前分數 (現狀)</th><th>最佳化預期分數</th><th>分數成長</th></tr></thead><tbody>"
     for i, cat in enumerate(categories):
         diff = rep_predicted_scores[i] - curr_scores[i]
@@ -793,7 +723,6 @@ elif st.session_state.get("authentication_status"):
     </tbody></table>
     """
 
-    # [組合 HTML: 2. 歷史趨勢表]
     trend_table_html = "<table><thead><tr>"
     if 'df_trend' in locals():
         for col in df_trend.columns:
@@ -809,7 +738,6 @@ elif st.session_state.get("authentication_status"):
     else:
         trend_table_html = "<p style='color:#7f8c8d;'>無歷史數據可供顯示。</p>"
 
-    # [組合 HTML: 3. 部門診斷與分配]
     risk_cards_html = ""
     table_rows = ""
     for i, cat in enumerate(categories):
@@ -838,7 +766,6 @@ elif st.session_state.get("authentication_status"):
         </div>
         """
 
-    # [最終 HTML 組裝]
     html_report = f"""
     <!DOCTYPE html>
     <html lang="zh-TW">
@@ -921,7 +848,6 @@ elif st.session_state.get("authentication_status"):
     </html>
     """
 
-    # 將按鈕放回左側選單
     with st.sidebar:
         st.divider()
         st.download_button(
