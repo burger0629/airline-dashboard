@@ -9,7 +9,7 @@ import requests
 import time
 from geopy.geocoders import Nominatim
 import feedparser  
-import urllib.parse # [新增] 用來安全編碼地理搜尋字串
+import urllib.parse 
 
 from auth_system import setup_authenticator 
 
@@ -191,7 +191,7 @@ elif st.session_state.get("authentication_status"):
     st.sidebar.download_button(label="📄 匯出完整營運診斷書 (Report)", data=report_content, file_name="Airline_Operations_Report.md", mime="text/markdown")
 
     # ==========================================
-    # API 函數定義 (氣象、座標與【動態圍籬情報】)
+    # API 函數定義 (氣象、座標與【嚴格動態圍籬情報】)
     # ==========================================
     @st.cache_data(show_spinner=False)
     def get_lat_lon(location_name):
@@ -219,7 +219,6 @@ elif st.session_state.get("authentication_status"):
 
     @st.cache_data(show_spinner=False)
     def get_midpoint_region(lat, lon):
-        # 反查航線中繼點的國家名稱，做為情報搜尋的依據
         try:
             geolocator = Nominatim(user_agent="airline_dashboard_v8")
             loc = geolocator.reverse((lat, lon), language='zh-TW', timeout=5)
@@ -250,7 +249,6 @@ elif st.session_state.get("authentication_status"):
 
     @st.cache_data(ttl=600, show_spinner=False)
     def get_route_conflict_alerts(origin_input, dest_input, mid_country):
-        # 🌟 核心升級：精準提取地名，不搜全球，只搜航線經過的區域！
         try:
             def extract_city(loc_str):
                 if '(' in loc_str: return loc_str.split('(')[1].split()[0]
@@ -259,23 +257,37 @@ elif st.session_state.get("authentication_status"):
             city_o = extract_city(origin_input)
             city_d = extract_city(dest_input)
             
-            # 將起點、終點、中繼點組合成動態地理條件
             regions = [city_o, city_d]
             if mid_country: regions.append(mid_country)
-            region_str = " OR ".join(regions)
             
-            # Google RSS 查詢語法：(台北 OR 東京 OR 日本) AND (飛彈 OR 空襲...)
-            query = f"({region_str}) AND (飛彈 OR 空襲 OR 軍事衝突 OR 開戰 OR 防空)"
+            # 🌟 1. 嚴格化威脅關鍵字 (排除「開戰=羽球體育」、「飛彈=庫存軍售」)
+            threat_keywords = ['空襲', '禁飛', '防空警報', '實彈', '封鎖空域', '戰機攔截', '擊落']
+            
+            region_str = " OR ".join(regions)
+            threat_str = " OR ".join(threat_keywords)
+            
+            # 🌟 2. 嚴格限制抓取「最近 7 天內」的新聞，排除 2023 舊聞
+            query = f"({region_str}) AND ({threat_str}) when:7d"
             safe_query = urllib.parse.quote(query)
             
             url = f"https://news.google.com/rss/search?q={safe_query}&hl=zh-TW&gl=TW&ceid=TW:zh-Hant"
             feed = feedparser.parse(url)
             
             alerts = []
-            for entry in feed.entries[:3]: 
-                clean_title = entry.title.rsplit(' - ', 1)[0]
-                pub_date = entry.published if 'published' in entry else ""
-                alerts.append({"title": clean_title, "date": pub_date, "link": entry.link})
+            for entry in feed.entries:
+                title_lower = entry.title.lower()
+                
+                # 🌟 3. Python 雙重驗證：強制標題內必須「同時」包含地區與威脅字眼，杜絕模糊抓取
+                has_threat = any(k in title_lower for k in threat_keywords)
+                has_region = any(r.lower() in title_lower for r in regions)
+                
+                if has_threat and has_region:
+                    clean_title = entry.title.rsplit(' - ', 1)[0]
+                    pub_date = entry.published if 'published' in entry else ""
+                    alerts.append({"title": clean_title, "date": pub_date, "link": entry.link})
+                    
+                if len(alerts) >= 3: 
+                    break
             return alerts
         except:
             return []
@@ -443,7 +455,7 @@ elif st.session_state.get("authentication_status"):
                 origin_input = origin_sel
 
         with route_col2:
-            dest_sel = st.selectbox("🛬 選擇降落機場 (Destination)", airport_presets, index=1) # 預設改為 NRT 方便測試
+            dest_sel = st.selectbox("🛬 選擇降落機場 (Destination)", airport_presets, index=1)
             if dest_sel == "🌍 自行輸入其他地點...":
                 dest_input = st.text_input("請輸入降落地點 (中英文皆可)：", placeholder="例如: 羅馬, 首爾 ICN...")
             else:
@@ -464,7 +476,6 @@ elif st.session_state.get("authentication_status"):
                 mid_lat = (o_lat + d_lat) / 2
                 mid_lon = (o_lon + d_lon) / 2
                 
-                # 取得中繼點的國家名稱，作為精準過濾情報的依據
                 mid_country = get_midpoint_region(mid_lat, mid_lon)
                 
                 o_wind, o_temp, o_cond = get_live_weather(o_lat, o_lon)
@@ -541,7 +552,7 @@ elif st.session_state.get("authentication_status"):
                 with map_col1:
                     st.error(f"### 🚨 航線周邊軍事與地緣政治警戒 (LIVE)")
                     
-                    # 呼叫升級版的地理圍籬情報雷達
+                    # 呼叫已經過濾掉「體育開戰」與「歷史舊聞」的嚴格版雷達
                     live_alerts = get_route_conflict_alerts(origin_input, dest_input, mid_country)
                     
                     if live_alerts:
@@ -554,7 +565,7 @@ elif st.session_state.get("authentication_status"):
                             </div>
                             """, unsafe_allow_html=True)
                     else:
-                        st.success("✅ 目前系統掃描起降區域與中繼航路，未發現飛彈或重大軍事衝突之警戒。航線評估為安全。")
+                        st.success("✅ 目前系統掃描起降區域與中繼航路，未發現重大空襲或軍事衝突之警戒。航線評估為安全。")
                         
                     st.markdown("---")    
                     st.button("❌ 拒絕此航線並發布避讓指令", type="primary")
@@ -607,7 +618,7 @@ elif st.session_state.get("authentication_status"):
                             你的說話風格專業、自然、冷靜且具備同理心，就像一位真實存在的高階軍事/航空顧問。
                             
                             [嚴格限制與職責]
-                            1. 領域限制：你的回答必須絕對限制在"航空營運、安全管理系統(SMS)、風險分析(如瑞士起司模型)、機隊維修、航線威脅評估、地緣政治飛安影響、飛彈危機應對"領域。若問題無關，請禮貌引導回飛安主題。
+                            1. 領域限制：你的回答必須絕對限制在"航空營運、安全管理系統(SMS)、風險分析(如瑞士起司模型)、機隊維修、航線威脅評估、地緣政治飛安影響、防空危機應對"領域。若問題無關，請禮貌引導回飛安主題。
                             2. 數據支撐：請務必「融合」以下兩大板塊的即時數據來提供客製化建議：
                             
                                [板塊一：內部營運體質]
