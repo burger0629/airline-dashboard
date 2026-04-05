@@ -10,6 +10,7 @@ import time
 from geopy.geocoders import Nominatim
 import feedparser
 import urllib.parse
+import sqlite3
 
 from auth_system import setup_authenticator
 
@@ -88,7 +89,25 @@ elif st.session_state.get("authentication_status"):
     curr_scores = np.array([curr_safety, curr_maint, curr_otp, curr_service])
     prev_scores = np.array([prev_safety, prev_maint, prev_otp, prev_service])
 
+    # ==========================================
+    # 升級 4：多維度交叉限制最佳化演算法
+    # ==========================================
     def objective(x, current_scores, weights):
+        k_factors = np.array([1.5, 2.0, 1.2, 1.0])
+        new_scores = current_scores + k_factors * np.sqrt(x)
+        
+        # 交叉懲罰機制：維修是飛安的基石
+        # 如果分配給「機隊維修」(x[1]) 的預算低於總預算的 15%，飛安分數會遭到非線性扣減
+        maint_ratio = x[1] / (total_budget + 1e-9)
+        safety_penalty = 0
+        if maint_ratio < 0.15:
+            # 預算越低，懲罰越重 (最大扣 20 分)
+            safety_penalty = 20 * (0.15 - maint_ratio) / 0.15 
+            
+        new_scores[0] -= safety_penalty
+        new_scores = np.clip(new_scores, 0, 100)
+        
+        return np.sum(weights * (100 - new_scores))
         k_factors = np.array([1.5, 2.0, 1.2, 1.0])
         new_scores = np.clip(current_scores + k_factors * np.sqrt(x), 0, 100)
         return np.sum(weights * (100 - new_scores))
@@ -112,6 +131,26 @@ elif st.session_state.get("authentication_status"):
         allocations = initial_guess
         
     alloc_dict = {cat: alloc for cat, alloc in zip(categories, allocations)}
+    # ==========================================
+    # 升級 1：SQLite 決策數據持久化
+    # ==========================================
+    def log_decision_to_db(user, budget, safety_alloc, maint_alloc, otp_alloc, serv_alloc, result_msg):
+        try:
+            conn = sqlite3.connect('aviation_war_room.db')
+            c = conn.cursor()
+            c.execute('''CREATE TABLE IF NOT EXISTS decision_logs 
+                         (timestamp TEXT, commander TEXT, total_budget REAL, 
+                          safety_alloc REAL, maint_alloc REAL, otp_alloc REAL, serv_alloc REAL, status TEXT)''')
+            c.execute("INSERT INTO decision_logs VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 
+                      (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), user, budget, 
+                       safety_alloc, maint_alloc, otp_alloc, serv_alloc, result_msg))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            st.sidebar.error(f"資料庫寫入失敗: {e}")
+
+    # 執行寫入
+    log_decision_to_db(name, total_budget, allocations[0], allocations[1], allocations[2], allocations[3], "Success" if result.success else "Failed")
 
     def get_risk_level_config(score):
         if score == 100.0: return ('perfect', "#00d26a", "🏆 卓越典範 (PERFECT) —— 系統處於理想狀態，維持卓越並分享經驗")
@@ -334,6 +373,24 @@ elif st.session_state.get("authentication_status"):
             years = ['2022', '2023', '2024', '2025', '2026(YTD)']
             df_trend = pd.DataFrame({'年份': years, '飛安控管': [92, 88, 85, prev_safety, curr_safety], '機隊維修': [80, 75, 65, prev_maint, curr_maint], '航班調度': [88, 85, 82, prev_otp, curr_otp], '旅客服務': [85, 90, 92, prev_service, curr_service]})
         
+        # ==========================================
+        # 升級 2：Sklearn 時間序列趨勢預測
+        # ==========================================
+        from sklearn.linear_model import LinearRegression
+        
+        # 準備訓練特徵 (將年份轉為數字 1, 2, 3, 4, 5)
+        X_train = np.array([1, 2, 3, 4, 5]).reshape(-1, 1)
+        next_year = np.array([[6]]) # 預測第 6 年
+        
+        predicted_scores = []
+        for col in categories:
+            y_train = df_trend[col].values
+            model = LinearRegression().fit(X_train, y_train)
+            pred = np.clip(model.predict(next_year)[0], 0, 100) # 確保分數在 0-100
+            predicted_scores.append(round(pred, 1))
+            
+        # 將預測結果加入 DataFrame
+        df_trend.loc[len(df_trend)] = ['2027(AI預測)'] + predicted_scores
         df_melted = df_trend.melt(id_vars=['年份'], var_name='營運指標', value_name='分數')
         fig_line = px.line(df_melted, x='年份', y='分數', color='營運指標', markers=True, title='各項營運指標長期趨勢追蹤')
         fig_line.update_layout(yaxis=dict(range=[0, 100]))
@@ -668,12 +725,25 @@ elif st.session_state.get("authentication_status"):
                             alert_str = f"觸發實體交戰區: {locals().get('triggered_zone_name', '')}" if locals().get('is_route_dangerous', False) else "航線未觸及全球重大交戰區，評估為安全。"
                             
                             system_prompt = f"""
-                            你是一位擁有20年經驗的"航空公司營運與飛航安全戰略幕僚"。
+                           # ==========================================
+                            # 升級 3：RAG 飛安事故歷史知識庫
+                            # ==========================================
+                            historical_db = """
+                            - [GE235空難教訓] 單發動機失效時，錯誤的 CRM 溝通與未遵守 SOP 關錯發動機將導致災難。
+                            - [CI611空難教訓] 機隊維修的「金屬疲勞」與「結構損傷」若無確實記錄與追蹤，將在數年後引發空中解體。
+                            - [跨國空域風險] 航班若經過地緣政治不穩定區 (如 MH17 事件)，航路選擇的優先級必須是物理安全大於油耗經濟性。
+                            """
+                            
+                            system_prompt = f"""
+                            你是一位擁有20年經驗的「航空公司營運與飛航安全戰略幕僚」。
                             [數據支撐：內外部融合 Context]
                                【內部妥善率】安:{curr_safety}, 修:{curr_maint}, 調:{curr_otp}, 服:{curr_service}
-                               【外部 LIVE 情報】
-                               - 當前監控航線：{route_str}
-                               - 航線幾何警戒判定：{alert_str}
+                               【外部 LIVE 情報】當前監控航線：{route_str} | 警戒判定：{alert_str}
+                            
+                            [核心決策原則庫]
+                            {historical_db}
+                            
+                            請嚴格根據上述內部妥善率與外部情報回答使用者的問題。若分數呈現高風險，請務必引用[核心決策原則庫]中的歷史教訓給予嚴厲警告。
                             """
                             
                             response = client.chat.completions.create(
