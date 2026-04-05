@@ -403,8 +403,14 @@ elif st.session_state.get("authentication_status"):
             with loss_cols[1]:
                 st.write("### 📉 投資報酬率分析")
                 st.metric("🔴 目前預估年度隱性損失", f"{current_loss:,.1f} 百萬", "維持現狀的代價", delta_color="inverse")
-                st.metric("🟢 模擬後預估年度隱性損失", f"{predicted_loss:,.1f} 百萬", f"投資報酬率 (ROI): {((saved_money/total_sim)*100):.1f}%" if total_sim>0 else "0%", delta_color="normal")
-
+                
+                # 優化：計算 ROI，並將顯示精度提高到小數點後三位
+                roi_value = (saved_money / total_sim * 100) if total_sim > 0 else 0
+                st.metric("🟢 模擬後預估年度隱性損失", f"{predicted_loss:,.1f} 百萬", f"投資報酬率 (ROI): {roi_value:.3f}%", delta_color="normal")
+                
+                # 優化：新增極端值的防呆提示
+                if roi_value < 1.0 and total_sim > current_loss:
+                    st.caption("💡 **系統提示**：投資金額遠大於可挽回損失，已觸發嚴重的「邊際效應遞減（Diminishing Returns）」，再投入資金也無法顯著提升分數，建議大幅降低預算。")
             st.divider()
             st.markdown("### 🤖 AI 財務深度診斷與改善建議")
             st.caption("根據您上方的預算分配模擬，由 AI 幕僚生成專業的財務與營運衝擊報告。")
