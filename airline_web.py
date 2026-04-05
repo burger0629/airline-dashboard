@@ -75,13 +75,14 @@ elif st.session_state.get("authentication_status"):
 
         st.sidebar.divider()
         st.sidebar.subheader("🚧 系統資源限制 (Constraints)")
-        total_budget = st.sidebar.number_input("💰 可用總預算 (百萬台幣)", min_value=10.0, value=500.0, step=10.0)
+        # 🌟 預算無上限 (max_value=None)，預設為 100,000 百萬 (1000億台幣)，級距改為 1000 百萬
+        total_budget = st.sidebar.number_input("💰 可用總預算 (百萬台幣)", min_value=10.0, max_value=None, value=100000.0, step=1000.0, format="%.1f")
         max_labor_hours = st.sidebar.number_input("👷 最大可用維修工時 (小時)", min_value=1000, value=15000, step=500)
     else:
         st.sidebar.info("權限限制：您目前為「分析官」，僅具備檢視權限，無權進行最佳化資源重分配。")
         curr_safety, curr_maint, curr_otp, curr_service = 75.0, 45.0, 85.0, 90.0
         prev_safety, prev_maint, prev_otp, prev_service = 85.0, 60.0, 80.0, 95.0
-        total_budget, max_labor_hours = 500.0, 15000
+        total_budget, max_labor_hours = 100000.0, 15000
 
     categories = ['飛安控管', '機隊維修', '航班調度', '旅客服務']
     weights = np.array([0.40, 0.30, 0.20, 0.10])
@@ -131,9 +132,6 @@ elif st.session_state.get("authentication_status"):
         """, unsafe_allow_html=True)
         return level
 
-    # ==========================================
-    # 🌟 核心保留：完整 24 組深度六級知識庫
-    # ==========================================
     knowledge_base = {
         '飛安控管': {
             'catastrophic': { 'reasons': ["安全管理系統 (SMS) 徹底癱瘓，內部甚至出現刻意隱瞞違規之現象。", "組織失去對風險的任何感知能力，隨時可能發生重大空難。"], 'actions': ["🚨 **[立即指令]** 總經理下令全機隊立即停飛，所有簽派與飛航作業強制暫停，等待外部聯合專案組進駐稽核。", "🚨 **[組織重整]** 解散現有安委會，凍結相關主管職權，重新考核核心關鍵崗位人員之飛安意識。"] },
@@ -250,7 +248,6 @@ elif st.session_state.get("authentication_status"):
         except:
             return "N/A", "N/A", "連線失敗"
 
-    # 🌟 [回歸] NLP 嚴格戰區情報擷取 (包含防偽陽性與語意切割)
     @st.cache_data(ttl=600, show_spinner=False)
     def get_warzone_alerts(zone_name):
         try:
@@ -270,7 +267,7 @@ elif st.session_state.get("authentication_status"):
             for entry in feed.entries:
                 title_lower = entry.title.lower()
                 
-                # 🚫 終極擴充負面表列：精準排除「部署、政策、配備」等軍事常態新聞
+                # 🚫 排除軍購備戰與娛樂假新聞
                 exclusions = ['部署', '配備', '政策', '反擊', '研發', '採購', '試射', '軍售', '合約', '升級', '庫存',
                               '小說', '電影', '遊戲', '劇', '年前', '演習', '演練', '測試', '速寫', '回顧', '歷史', '紀念', '模擬']
                 if any(x in title_lower for x in exclusions):
@@ -363,18 +360,19 @@ elif st.session_state.get("authentication_status"):
     with tab3:
         st.subheader("💸 財務沙盤推演 (ROI Simulator)")
         st.markdown("將「營運分數缺口」換算為真實營業損失預估，並手動調配預算測試投資報酬率。")
-        st.info(f"您目前共有 **{total_budget} 百萬** 的籌碼可以分配。")
+        st.info(f"您目前共有 **{total_budget:.1f} 百萬** 的籌碼可以分配。")
         
         sim_cols = st.columns(4)
         sim_allocs = []
         for i, cat in enumerate(categories):
             with sim_cols[i]:
-                val = st.number_input(f"投入【{cat}】(百萬)", min_value=0.0, max_value=float(total_budget), value=float(alloc_dict[cat]), step=10.0, key=f"sim_{i}")
+                # 🌟 修復：移除 max_value，允許輸入極大數字
+                val = st.number_input(f"投入【{cat}】(百萬)", min_value=0.0, max_value=None, value=float(alloc_dict[cat]), step=100.0, format="%.1f", key=f"sim_{i}")
                 sim_allocs.append(val)
                 
         total_sim = sum(sim_allocs)
         if total_sim > total_budget:
-            st.error(f"⚠️ 預算超支！您分配了 {total_sim} 百萬，但總預算只有 {total_budget} 百萬。")
+            st.error(f"⚠️ 預算超支！您分配了 {total_sim:.1f} 百萬，但總預算只有 {total_budget:.1f} 百萬。")
         else:
             k_factors = np.array([1.5, 2.0, 1.2, 1.0])
             predicted_scores = np.clip(curr_scores + k_factors * np.sqrt(sim_allocs), 0, 100)
@@ -400,7 +398,7 @@ elif st.session_state.get("authentication_status"):
                 st.metric("🔴 目前預估年度隱性損失", f"{current_loss:.1f} 百萬", "維持現狀的代價", delta_color="inverse")
                 st.metric("🟢 模擬後預估年度隱性損失", f"{predicted_loss:.1f} 百萬", f"投資報酬率 (ROI): {((saved_money/total_sim)*100):.1f}%" if total_sim>0 else "0%", delta_color="normal")
 
-            # 🌟 [回歸] AI 財務分析按鈕
+            # 🌟 回歸的 AI 財務分析按鈕
             st.divider()
             st.markdown("### 🤖 AI 財務深度診斷與改善建議")
             st.caption("根據您上方的預算分配模擬，由 AI 幕僚生成專業的財務與營運衝擊報告。")
@@ -445,11 +443,11 @@ elif st.session_state.get("authentication_status"):
         route_col1, route_col2 = st.columns(2)
         with route_col1:
             origin_sel = st.selectbox("🛫 選擇起飛機場 (Origin)", airport_presets, index=0)
-            origin_input = origin_sel if origin_sel != "🌍 自行輸入其他地點..." else st.text_input("請輸入起飛地點 (中英文皆可)：", placeholder="例如: 巴黎, 曼谷 BKK...")
+            origin_input = origin_sel if origin_sel != "🌍 自行輸入其他地點..." else st.text_input("請輸入起飛地點 (中英文皆可)：", placeholder="例如: 巴黎")
 
         with route_col2:
             dest_sel = st.selectbox("🛬 選擇降落機場 (Destination)", airport_presets, index=1)
-            dest_input = dest_sel if dest_sel != "🌍 自行輸入其他地點..." else st.text_input("請輸入降落地點 (中英文皆可)：", placeholder="例如: 羅馬, 首爾 ICN...")
+            dest_input = dest_sel if dest_sel != "🌍 自行輸入其他地點..." else st.text_input("請輸入降落地點 (中英文皆可)：", placeholder="例如: 羅馬")
 
         if origin_input and dest_input:
             with st.spinner('📡 正在定位座標並計算物理碰撞預警...'):
@@ -464,9 +462,7 @@ elif st.session_state.get("authentication_status"):
                 mid_lat, mid_lon = (o_lat + d_lat) / 2, (o_lon + d_lon) / 2
                 o_wind, o_temp, o_cond = get_live_weather(o_lat, o_lon)
                 d_wind, d_temp, d_cond = get_live_weather(d_lat, d_lon)
-                mid_country = get_midpoint_region(mid_lat, mid_lon)
 
-                # OpenSky 航班
                 try:
                     bbox = f"lamin={mid_lat-5}&lomin={mid_lon-5}&lamax={mid_lat+5}&lomax={mid_lon+5}"
                     air_res = requests.get(f"https://opensky-network.org/api/states/all?{bbox}", timeout=3).json()
@@ -478,7 +474,6 @@ elif st.session_state.get("authentication_status"):
                     f_lats, f_lons = mid_lat + np.random.uniform(-8, 8, 30), mid_lon + np.random.uniform(-8, 8, 30)
                     traffic_status = "🟡 Traffic Simulated (OpenSky Offline)"
 
-                # 🌟 [回歸] 幾何物理碰撞檢測
                 actual_conflict_zones = [
                     {"name": "⚠️ 東歐交戰區 (烏俄)", "lat": 48.0, "lon": 37.0, "radius_size": 150, "threat_deg": 12.0}, 
                     {"name": "⚠️ 紅海區域威脅 (葉門)", "lat": 15.0, "lon": 42.0, "radius_size": 100, "threat_deg": 10.0}, 
@@ -505,7 +500,6 @@ elif st.session_state.get("authentication_status"):
 
                 fig_map = go.Figure()
 
-                # 真實紅圈
                 for zone in actual_conflict_zones:
                     fig_map.add_trace(go.Scattergeo(
                         lat=[zone["lat"]], lon=[zone["lon"]],
@@ -513,7 +507,6 @@ elif st.session_state.get("authentication_status"):
                         name=zone["name"], mode="markers", text=zone["name"], hoverinfo="text"
                     ))
 
-                # 動態航線顏色
                 fig_map.add_trace(go.Scattergeo(
                     lat=[o_lat, d_lat] if not is_route_dangerous else [o_lat, mid_lat, d_lat], 
                     lon=[o_lon, d_lon] if not is_route_dangerous else [o_lon, mid_lon, d_lon],
@@ -537,13 +530,17 @@ elif st.session_state.get("authentication_status"):
                         name="✈️ 周邊民航機即時動態"
                     ))
 
+                # 🌟 修復：圖例高亮，白字清晰顯示
                 fig_map.update_geos(
                     projection_type="natural earth", showcountries=True, countrycolor="RebeccaPurple",
                     showland=True, landcolor="rgb(30, 30, 30)", oceancolor="rgb(10, 10, 20)", showocean=True,
                     lataxis_range=[min(o_lat, d_lat, detour_lat if is_route_dangerous else d_lat)-15, max(o_lat, d_lat, detour_lat if is_route_dangerous else d_lat)+15], 
                     lonaxis_range=[min(o_lon, d_lon, detour_lon if is_route_dangerous else d_lon)-15, max(o_lon, d_lon, detour_lon if is_route_dangerous else d_lon)+15]
                 )
-                fig_map.update_layout(height=500, margin=dict(l=0, r=0, t=30, b=0), paper_bgcolor="rgb(10, 10, 10)", legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01))
+                fig_map.update_layout(
+                    height=500, margin=dict(l=0, r=0, t=30, b=0), paper_bgcolor="rgb(10, 10, 10)", 
+                    legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01, font=dict(color="white", size=13))
+                )
                 st.caption(traffic_status)
                 st.plotly_chart(fig_map, use_container_width=True)
 
