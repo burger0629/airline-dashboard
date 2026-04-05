@@ -22,9 +22,11 @@ st.set_page_config(page_title="航空公司營運戰情室 (God Mode)", layout="
 # 🔒 全局 API Key 讀取 
 # ==========================================
 try:
-api_key = st.secrets.get("OPENAI_API_KEY", "")
+    # 這裡必須縮排 4 個空格
+    api_key = st.secrets.get("OPENAI_API_KEY", "")
 except:
-api_key = ""
+    # 這裡也必須縮排 4 個空格
+    api_key = ""
 
 # ==========================================
 # 1. 系統登入大門 
