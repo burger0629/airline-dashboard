@@ -551,8 +551,9 @@ elif st.session_state.get("authentication_status"):
                 fig_map.update_geos(
                     projection_type="natural earth", showcountries=True, countrycolor="RebeccaPurple",
                     showland=True, landcolor="rgb(30, 30, 30)", oceancolor="rgb(10, 10, 20)", showocean=True,
-                    lataxis_range=[min(o_lat, d_lat, detour_lat if is_route_dangerous else d_lat)-15, max(o_lat, d_lat, detour_lat if is_route_dangerous else d_lat)+15], 
-                    lonaxis_range=[min(o_lon, d_lon, detour_lon if is_route_dangerous else d_lon)-15, max(o_lon, d_lon, detour_lon if is_route_dangerous else d_lon)+15]
+                    # 將舊的 detour_lat 替換為新的 wp1_lat 與 wp2_lon 來計算地圖邊界
+                    lataxis_range=[min(o_lat, d_lat, wp1_lat if is_route_dangerous else d_lat)-15, max(o_lat, d_lat, wp1_lat if is_route_dangerous else d_lat)+15], 
+                    lonaxis_range=[min(o_lon, d_lon, wp1_lon if is_route_dangerous else d_lon)-15, max(o_lon, d_lon, wp2_lon if is_route_dangerous else d_lon)+15]
                 )
                 fig_map.update_layout(
                     height=500, margin=dict(l=0, r=0, t=30, b=0), paper_bgcolor="rgb(10, 10, 10)", 
