@@ -490,7 +490,7 @@ elif st.session_state.get("authentication_status"):
 
     with tab4:
         st.subheader("🌍 全球即時威脅圖 與 航線風險分析")
-        st.markdown("系統已導入 **實體交戰區幾何檢測演算法 (Geometric Intersection)**。如果您的航路一片和平（如飛往東京），系統將直接給予綠燈，絕不亂發警報。")
+        st.markdown("系統已導入 **實體交戰區幾何檢測演算法 (Geometric Intersection)**。")
         
         airport_presets = [
             "TPE (台北 桃園機場)", "NRT (東京 成田機場)", "SIN (新加坡 樟宜機場)",
