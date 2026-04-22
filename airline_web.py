@@ -13,6 +13,7 @@ import urllib.parse
 import sqlite3
 from sklearn.linear_model import LinearRegression
 
+# 若您本地端沒有 auth_system.py，請註解掉下方這行並繞過登入驗證
 from auth_system import setup_authenticator
 
 # ==========================================
@@ -60,7 +61,9 @@ elif st.session_state.get("authentication_status"):
     if user_role == "Commander":
         st.sidebar.subheader("【本年度營運數據模式】")
         
-        # 1. 模式切換開關
+        # ==========================================
+        # 🚀 升級模組：雙模式切換 (手動沙盤推演 vs 智慧數據驅動)
+        # ==========================================
         input_mode = st.sidebar.radio(
             "切換資料輸入模式：",
             ["🎚️ 手動模擬 (God Mode)", "📡 智慧數據驅動 (Data-Driven)"],
@@ -68,7 +71,6 @@ elif st.session_state.get("authentication_status"):
         )
         st.sidebar.divider()
 
-        # 2. 根據模式顯示不同的 UI 介面
         if input_mode == "🎚️ 手動模擬 (God Mode)":
             st.sidebar.caption("自由調整綜合指標，進行極端情境沙盤推演。")
             curr_safety = st.sidebar.slider("1. 飛安控管", 0.0, 100.0, 75.0, step=1.0)
@@ -83,7 +85,6 @@ elif st.session_state.get("authentication_status"):
                 foqa_events = st.number_input("FOQA 三級超標次數 (月)", value=12, min_value=0)
                 sms_reports = st.number_input("自願安全通報件數 (月)", value=45, min_value=0)
                 frms_alerts = st.number_input("組員疲勞警報率 (%)", value=5.2, format="%.1f")
-                # 結算邏輯
                 curr_safety = np.clip(100 - (foqa_events * 1.5) - (frms_alerts * 2.0) + (sms_reports * 0.1), 0.0, 100.0)
                 st.info(f"👉 結算飛安分數: **{curr_safety:.1f}**")
 
@@ -91,14 +92,12 @@ elif st.session_state.get("authentication_status"):
                 aog_hours = st.number_input("AOG 總停機小時", value=120, min_value=0)
                 dispatch_rel = st.slider("技術妥善率 (%)", 90.0, 100.0, 98.5, step=0.1)
                 add_count = st.number_input("保留缺失 (ADD) 總數", value=35, min_value=0)
-                # 結算邏輯
                 curr_maint = np.clip((dispatch_rel * 1.0) - (aog_hours * 0.1) - (add_count * 0.2), 0.0, 100.0)
                 st.info(f"👉 結算維修分數: **{curr_maint:.1f}**")
 
             with st.sidebar.expander("⏱️ 調度底層指標", expanded=False):
                 d15_otp = st.slider("D15 準點率 (%)", 50.0, 100.0, 82.5, step=0.1)
                 crew_shortage = st.number_input("組員調度異常次數", value=18, min_value=0)
-                # 結算邏輯
                 curr_otp = np.clip((d15_otp * 1.1) - (crew_shortage * 0.5), 0.0, 100.0)
                 st.info(f"👉 結算調度分數: **{curr_otp:.1f}**")
 
@@ -106,19 +105,13 @@ elif st.session_state.get("authentication_status"):
                 nps_score = st.slider("淨推薦值 (NPS)", -100, 100, 45)
                 baggage_loss = st.number_input("行李異常率 (每千人)", value=4.5, format="%.1f")
                 complaints = st.number_input("重大客訴件數", value=8, min_value=0)
-                # 結算邏輯：將 NPS -100~100 轉換為 0~100 比例
                 nps_normalized = (nps_score + 100) / 2
                 curr_service = np.clip(nps_normalized - (baggage_loss * 2.0) - (complaints * 1.5), 0.0, 100.0)
                 st.info(f"👉 結算服務分數: **{curr_service:.1f}**")
 
-        # 原本的「前年度」與「資源限制」區塊保持不變
         st.sidebar.divider()
         st.sidebar.subheader("【前年度 (Last Year)】")
-        prev_safety = st.sidebar.slider("1. 飛安控管 (去年)", 0.0, 100.0, 85.0, step=1.0)
-        # ... 後面的 prev_maint, prev_otp 等程式碼接續保留
-
-        st.sidebar.divider()
-        st.sidebar.subheader("【前年度 (Last Year)】")
+        # ✅ 已修復：確保這裡的拉桿 ID 全局唯一，解決 DuplicateElementId 錯誤
         prev_safety = st.sidebar.slider("1. 飛安控管 (去年)", 0.0, 100.0, 85.0, step=1.0)
         prev_maint = st.sidebar.slider("2. 機隊維修 (去年)", 0.0, 100.0, 60.0, step=1.0)
         prev_otp = st.sidebar.slider("3. 航班調度 (去年)", 0.0, 100.0, 80.0, step=1.0)
@@ -224,7 +217,7 @@ elif st.session_state.get("authentication_status"):
             'catastrophic': { 'reasons': ["安全管理系統 (SMS) 徹底癱瘓，內部甚至出現刻意隱瞞違規之現象。", "組織失去對風險的任何感知能力，隨時可能發生重大空難。"], 'actions': ["🚨 **[立即指令]** 總經理下令全機隊立即停飛，所有簽派與飛航作業強制暫停，等待外部聯合專案組進駐稽核。", "🚨 **[組織重整]** 解散現有安委會，凍結相關主管職權，重新考核核心關鍵崗位人員之飛安意識。"] },
             'high_risk': { 'reasons': ["防禦機制出現多重失效，「瑞士起司理論」漏洞穿透組織各層級。", "基層對「公正文化」完全失去信任，自願通報機制斷絕。"], 'actions': ["⚠️ **[危機處置]** 暫停高風險/易受天候影響航線運行，啟動無預警全機隊安全停飛檢查 (Stand-down)。", "⚠️ **[系統重審]** 全面盤點 SMS 運作狀況，重新驗證飛行員執照考勤與疲勞管理 (FRMS) 指標是否失真。"] },
             'serious': { 'reasons': ["存在組織性「孤島效應」，機務、航務與簽派數據無法有效橫向整合。", "SMS 退化為被動式的「事後檢討機制」，缺乏主動預測能力。"], 'actions': ["**[深度對策]** 成立總經理直屬專案小組，強制打通跨部門飛航數據壁壘。", "**[風險危害]** 針對輕微異常事件 (Incidents) 進行根本原因分析 (RCA)，找出組織層級的系統性漏洞。"] },
-            'caution': { 'reasons': ["飛行員面臨潛在的疲勞累積，情境警覺 (Situational Awareness) 開始下滑。", "組員資源管理 (CRM) 訓練成效降低，駕駛艙內質疑權威能力轉弱。"], 'actions': ["**[主怒監控]** 擴大 FOQA 飛行數據監測之分析深度，設定重落地、超速等偏差行為之嚴格警報門檻。", "**[組員資源]** 針對全體機師辦理「CRM 高階複訓」，強化面對複雜情境下的溝通效率與共同決策能力。"] },
+            'caution': { 'reasons': ["飛行員面臨潛在的疲勞累積，情境警覺 (Situational Awareness) 開始下滑。", "組員資源管理 (CRM) 訓練成效降低，駕駛艙內質疑權威能力轉弱。"], 'actions': ["**[主動監控]** 擴大 FOQA 飛行數據監測之分析深度，設定重落地、超速等偏差行為之嚴格警報門檻。", "**[組員資源]** 針對全體機師辦理「CRM 高階複訓」，強化面對複雜情境下的溝通效率與共同決策能力。"] },
             'stable': { 'reasons': ["防禦機制運作良好，數據監控與人員訓練均達標。"], 'actions': ["**[精益求精]** 系統運作穩健。請鼓勵公正文化 (Just Culture) 自願通報，找出隱藏在優良數據下的微小偏差。"] },
             'perfect': { 'reasons': ["已建立世界級飛安範本。組織上下視飛安為最高信仰。"], 'actions': ["**[卓越維持]** 策劃高強度、無預警的「重大空難場景模擬演習」，壓力測試組織之極端應變肌肉記憶。"] }
         },
@@ -737,7 +730,7 @@ elif st.session_state.get("authentication_status"):
                             alert_str = f"觸發實體交戰區: {locals().get('triggered_zone_name', '')}" if locals().get('is_route_dangerous', False) else "航線未觸及全球重大交戰區，評估為安全。"
                             
                             # ==========================================
-                            # 🚀 升級 3：RAG 飛安事故歷史知識庫 (單行字串究極防呆版)
+                            # 🚀 升級 3：RAG 飛安事故歷史知識庫
                             # ==========================================
                             historical_db = "- [GE235空難教訓] 單發動機失效時, 錯誤的 CRM 溝通與未遵守 SOP 關錯發動機將導致災難。\n- [CI611空難教訓] 機隊維修的金屬疲勞與結構損傷若無確實記錄與追蹤, 將在數年後引發空中解體。\n- [跨國空域風險] 航班若經過地緣政治不穩定區(如 MH17 事件), 航路選擇的優先級必須是物理安全大於油耗經濟性。"
                             system_prompt = (
@@ -761,7 +754,7 @@ elif st.session_state.get("authentication_status"):
                             st.error(f"⚠️ AI 幕僚連線失敗: {e}")
 
     # ==========================================
-    # 🚀 自動生成精美 HTML 企業級報告 (含財務與歷史趨勢)
+    # 🚀 自動生成精美 HTML 企業級報告
     # ==========================================
     rep_k_factors = np.array([1.5, 2.0, 1.2, 1.0])
     rep_predicted_scores = np.clip(curr_scores + rep_k_factors * np.sqrt(allocations), 0, 100)
