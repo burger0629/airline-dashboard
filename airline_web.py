@@ -58,11 +58,64 @@ elif st.session_state.get("authentication_status"):
     st.sidebar.header("📅 營運指標數據輸入")
 
     if user_role == "Commander":
-        st.sidebar.subheader("【本年度 (Current Year)】")
-        curr_safety = st.sidebar.slider("1. 飛安控管", 0.0, 100.0, 75.0, step=1.0)
-        curr_maint = st.sidebar.slider("2. 機隊維修", 0.0, 100.0, 45.0, step=1.0)
-        curr_otp = st.sidebar.slider("3. 航班調度", 0.0, 100.0, 85.0, step=1.0)
-        curr_service = st.sidebar.slider("4. 旅客服務", 0.0, 100.0, 90.0, step=1.0)
+        st.sidebar.subheader("【本年度營運數據模式】")
+        
+        # 1. 模式切換開關
+        input_mode = st.sidebar.radio(
+            "切換資料輸入模式：",
+            ["🎚️ 手動模擬 (God Mode)", "📡 智慧數據驅動 (Data-Driven)"],
+            horizontal=False
+        )
+        st.sidebar.divider()
+
+        # 2. 根據模式顯示不同的 UI 介面
+        if input_mode == "🎚️ 手動模擬 (God Mode)":
+            st.sidebar.caption("自由調整綜合指標，進行極端情境沙盤推演。")
+            curr_safety = st.sidebar.slider("1. 飛安控管", 0.0, 100.0, 75.0, step=1.0)
+            curr_maint = st.sidebar.slider("2. 機隊維修", 0.0, 100.0, 45.0, step=1.0)
+            curr_otp = st.sidebar.slider("3. 航班調度", 0.0, 100.0, 85.0, step=1.0)
+            curr_service = st.sidebar.slider("4. 旅客服務", 0.0, 100.0, 90.0, step=1.0)
+            
+        else:
+            st.sidebar.caption("輸入底層微觀 KPI，系統將自動演算綜合體質分數。")
+
+            with st.sidebar.expander("🛡️ 飛安底層指標", expanded=True):
+                foqa_events = st.number_input("FOQA 三級超標次數 (月)", value=12, min_value=0)
+                sms_reports = st.number_input("自願安全通報件數 (月)", value=45, min_value=0)
+                frms_alerts = st.number_input("組員疲勞警報率 (%)", value=5.2, format="%.1f")
+                # 結算邏輯
+                curr_safety = np.clip(100 - (foqa_events * 1.5) - (frms_alerts * 2.0) + (sms_reports * 0.1), 0.0, 100.0)
+                st.info(f"👉 結算飛安分數: **{curr_safety:.1f}**")
+
+            with st.sidebar.expander("🔧 維修底層指標", expanded=False):
+                aog_hours = st.number_input("AOG 總停機小時", value=120, min_value=0)
+                dispatch_rel = st.slider("技術妥善率 (%)", 90.0, 100.0, 98.5, step=0.1)
+                add_count = st.number_input("保留缺失 (ADD) 總數", value=35, min_value=0)
+                # 結算邏輯
+                curr_maint = np.clip((dispatch_rel * 1.0) - (aog_hours * 0.1) - (add_count * 0.2), 0.0, 100.0)
+                st.info(f"👉 結算維修分數: **{curr_maint:.1f}**")
+
+            with st.sidebar.expander("⏱️ 調度底層指標", expanded=False):
+                d15_otp = st.slider("D15 準點率 (%)", 50.0, 100.0, 82.5, step=0.1)
+                crew_shortage = st.number_input("組員調度異常次數", value=18, min_value=0)
+                # 結算邏輯
+                curr_otp = np.clip((d15_otp * 1.1) - (crew_shortage * 0.5), 0.0, 100.0)
+                st.info(f"👉 結算調度分數: **{curr_otp:.1f}**")
+
+            with st.sidebar.expander("🤝 服務底層指標", expanded=False):
+                nps_score = st.slider("淨推薦值 (NPS)", -100, 100, 45)
+                baggage_loss = st.number_input("行李異常率 (每千人)", value=4.5, format="%.1f")
+                complaints = st.number_input("重大客訴件數", value=8, min_value=0)
+                # 結算邏輯：將 NPS -100~100 轉換為 0~100 比例
+                nps_normalized = (nps_score + 100) / 2
+                curr_service = np.clip(nps_normalized - (baggage_loss * 2.0) - (complaints * 1.5), 0.0, 100.0)
+                st.info(f"👉 結算服務分數: **{curr_service:.1f}**")
+
+        # 原本的「前年度」與「資源限制」區塊保持不變
+        st.sidebar.divider()
+        st.sidebar.subheader("【前年度 (Last Year)】")
+        prev_safety = st.sidebar.slider("1. 飛安控管 (去年)", 0.0, 100.0, 85.0, step=1.0)
+        # ... 後面的 prev_maint, prev_otp 等程式碼接續保留
 
         st.sidebar.divider()
         st.sidebar.subheader("【前年度 (Last Year)】")
