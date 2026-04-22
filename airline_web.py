@@ -66,7 +66,7 @@ elif st.session_state.get("authentication_status"):
         # ==========================================
         input_mode = st.sidebar.radio(
             "切換資料輸入模式：",
-            [" 手動模擬 ", " 智慧數據驅動 "],
+            ["🎚️ 手動模擬 (God Mode)", "📡 智慧數據驅動 (Data-Driven)"],
             horizontal=False
         )
         st.sidebar.divider()
@@ -78,7 +78,7 @@ elif st.session_state.get("authentication_status"):
             curr_otp = st.sidebar.slider("3. 航班調度", 0.0, 100.0, 85.0, step=1.0)
             curr_service = st.sidebar.slider("4. 旅客服務", 0.0, 100.0, 90.0, step=1.0)
             
-       else:
+        else:
             st.sidebar.caption("輸入底層微觀 KPI，系統將自動演算綜合體質分數。")
 
             with st.sidebar.expander("🛡️ 飛安底層指標", expanded=True):
