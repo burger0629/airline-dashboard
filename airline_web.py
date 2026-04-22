@@ -66,7 +66,7 @@ elif st.session_state.get("authentication_status"):
         # ==========================================
         input_mode = st.sidebar.radio(
             "切換資料輸入模式：",
-            ["🎚️ 手動模擬 (God Mode)", "📡 智慧數據驅動 (Data-Driven)"],
+            [" 手動模擬 ", " 智慧數據驅動 "],
             horizontal=False
         )
         st.sidebar.divider()
