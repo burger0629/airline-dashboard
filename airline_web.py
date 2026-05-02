@@ -151,10 +151,10 @@ elif st.session_state.get("authentication_status"):
 
     # 擷取歷史趨勢數據作為決策矩陣 (Decision Matrix)
     historical_data = {
-        '飛安控管': [92, 88, 85, prev_safety, curr_safety],
-        '機隊維修': [80, 75, 65, prev_maint, curr_maint],
-        '航班調度': [88, 85, 82, prev_otp, curr_otp],
-        '旅客服務': [85, 90, 92, prev_service, curr_service]
+    '飛安控管': [92, 88, 85, prev_safety, curr_safety],
+    '機隊維修': [80, 75, 65, prev_maint, curr_maint],
+    '航班調度': [88, 85, 82, prev_otp, curr_otp],
+    '旅客服務': [85, 90, 92, prev_service, curr_service]
     }
     df_decision = pd.DataFrame(historical_data)
     directions = [1, 1, 1, 1] # 四項指標皆為分數越高越好 (MAX)
