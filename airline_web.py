@@ -127,7 +127,7 @@ elif st.session_state.get("authentication_status"):
         prev_safety, prev_maint, prev_otp, prev_service = 85.0, 60.0, 80.0, 95.0
         total_budget, max_labor_hours = 100000.0, 15000
 
-   categories = ['飛安控管', '機隊維修', '航班調度', '旅客服務']
+    categories = ['飛安控管', '機隊維修', '航班調度', '旅客服務']
     curr_scores = np.array([curr_safety, curr_maint, curr_otp, curr_service])
     prev_scores = np.array([prev_safety, prev_maint, prev_otp, prev_service])
 
